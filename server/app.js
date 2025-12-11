@@ -4,6 +4,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import fileUpload from 'express-fileupload';
 
+import { createTables } from './utils/createTable.js';
+
 const app = express();
 
 config({ path: './config/config.env' });
@@ -22,5 +24,7 @@ app.use(fileUpload({
     tempFileDir: './uploads',
     useTempFiles: true,
 }));
+
+createTables();
 
 export default app;

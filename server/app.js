@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import fileUpload from 'express-fileupload';
 
 import { createTables } from './utils/createTable.js';
+import routes from './routes/routes.js';
 
 const app = express();
 
@@ -24,6 +25,8 @@ app.use(fileUpload({
     tempFileDir: './uploads',
     useTempFiles: true,
 }));
+
+routes(app);
 
 createTables();
 

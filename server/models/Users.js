@@ -18,8 +18,6 @@ export const createUsersTable = async () => {
 
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
-                reset_password_token TEXT DEFAULT NULL,
-                reset_password_expire TIMESTAMP DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

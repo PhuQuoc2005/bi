@@ -6,8 +6,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Dashboard } from '@/components/features/Dashboard';
 import { POS } from '@/components/features/POS';
 import { InventoryManager } from '@/components/features/Inventory';
-import { CustomerManager } from '@/components/features/CustomerManager';
 import { AIAssistant } from '@/components/features/AIAssistant';
+import { CustomerManager } from '@/components/features/CustomerManager';
 import { PRODUCTS, CUSTOMERS } from '@/lib/constants';
 
 export default function Home() {

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DigiHKD POS - Phiên bản Nâng cấp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+    [x-cloak] { display: none !important; }
+    *:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+    
+    .ai-pulse { animation: pulse-green 2s infinite; }
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* --- PHẦN QUAN TRỌNG ĐÃ SỬA --- */
+    
+    /* 1. Ẩn khu vực in khi xem trên màn hình thường */
+    #invoice-print-area { 
+        display: none; 
+    }
+
+    /* 2. Cấu hình khi nhấn lệnh IN (Ctrl+P hoặc nút In) */
+    @media print {
+        /* Ẩn tất cả mọi thứ khác */
+        body * { 
+            visibility: hidden; 
+        }
+        
+        /* Chỉ hiện khu vực hóa đơn */
+        #invoice-print-area, #invoice-print-area * { 
+            visibility: visible; 
+            display: block !important; /* Bắt buộc hiện lại khi in */
+        }
+        
+        /* Định vị hóa đơn về góc giấy in */
+        #invoice-print-area { 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: 80mm; /* Khổ giấy in nhiệt K80 */
+            font-size: 12px;
+            background: white;
+        }
+        
+        /* Ẩn các thành phần giao diện thừa */
+        .no-print { display: none !important; }
+    }
+</style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800" x-data="posApp()" x-init="init()" @keydown.window="handleShortcuts($event)">
+
+    <div x-show="!isLoggedIn" x-transition.opacity.duration.500ms class="fixed inset-0 bg-slate-900 z-[100] flex items-center justify-center">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md mx-4 text-center">
+            <div class="w-20 h-20 bg-blue-600 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <i class="fas fa-fingerprint text-white text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Xin chào!</h2>
+            <p class="text-slate-500 mb-8">Vui lòng đăng nhập để bắt đầu ca làm việc.</p>
+            <form @submit.prevent="login" class="space-y-4">
+                <input type="text" placeholder="Tên đăng nhập" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition">
+                <input type="password" placeholder="Mật khẩu" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition">
+                <button type="submit" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-200">
+                    VÀO CA (ENTER)
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="flex h-screen" x-show="isLoggedIn" x-cloak>
+        <aside class="w-16 lg:w-20 bg-slate-900 text-white flex flex-col items-center py-6 gap-6 no-print shadow-xl z-20">
+            <div class="text-2xl font-bold text-blue-500 mb-4">POS</div>
+            
+            <button class="w-10 h-10 rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/40 flex items-center justify-center tooltip-container group relative">
+                <i class="fas fa-cash-register"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50">Bán hàng (F1)</span>
+            </button>
+            
+            <button class="w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center group relative">
+                <i class="fas fa-history"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50">Lịch sử đơn</span>
+            </button>
+
+            <button class="w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition flex items-center justify-center group relative">
+                <i class="fas fa-box-open"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50">Kho hàng</span>
+            </button>
+
+            <div class="mt-auto">
+                <button @click="logout" class="w-10 h-10 rounded-xl hover:bg-red-500/20 text-red-400 transition flex items-center justify-center" title="Đăng xuất">
+                    <i class="fas fa-power-off"></i>
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
+            <header class="h-16 bg-white border-b flex items-center justify-between px-6 no-print shrink-0 z-10">
+                <div class="flex items-center gap-3 w-1/2">
+                    <div class="relative w-full max-w-lg group">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition"></i>
+                        <input 
+                            x-ref="searchInput"
+                            type="text" 
+                            placeholder="Tìm sản phẩm (F2)..." 
+                            class="w-full pl-10 pr-12 py-2.5 bg-slate-100 border-transparent border focus:bg-white focus:border-blue-500 rounded-xl text-sm outline-none transition shadow-sm"
+                            x-model="searchQuery"
+                            @input.debounce="filterProducts">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 border border-slate-300 px-1.5 rounded">F2</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-6">
+                    <div class="flex bg-slate-100 p-1 rounded-lg">
+                        <button @click="viewMode = 'grid'" :class="{'bg-white shadow text-blue-600': viewMode === 'grid', 'text-slate-400': viewMode !== 'grid'}" class="p-1.5 rounded-md transition"><i class="fas fa-th-large"></i></button>
+                        <button @click="viewMode = 'list'" :class="{'bg-white shadow text-blue-600': viewMode === 'list', 'text-slate-400': viewMode !== 'list'}" class="p-1.5 rounded-md transition"><i class="fas fa-list"></i></button>
+                    </div>
+
+                    <div class="flex items-center gap-3 pl-6 border-l">
+                        <div class="text-right hidden md:block">
+                            <p class="text-sm font-bold text-slate-700" x-text="employee.name"></p>
+                            <p class="text-xs text-green-600 font-medium">● Đang trực tuyến</p>
+                        </div>
+                        <img :src="employee.avatar" class="w-9 h-9 rounded-full border border-slate-200">
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 flex overflow-hidden">
+                <section class="flex-1 overflow-y-auto p-4 no-print scroll-smooth" id="productList">
+                    
+                    <div x-show="viewMode === 'grid'" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                        <template x-for="product in filteredProducts" :key="product.id">
+                            <div 
+                                class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:border-blue-400 hover:shadow-md cursor-pointer transition-all group relative h-full flex flex-col"
+                                @click="addToCart(product)">
+                                <div class="aspect-[4/3] bg-slate-50 rounded-xl mb-3 flex items-center justify-center overflow-hidden relative">
+                                    <template x-if="product.image">
+                                        <img :src="product.image" class="w-full h-full object-cover">
+                                    </template>
+                                    <template x-if="!product.image">
+                                        <i class="fas fa-cube text-slate-300 text-3xl"></i>
+                                    </template>
+                                    <div class="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition"></div>
+                                    <span x-show="product.stock < 10" class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">Sắp hết</span>
+                                </div>
+                                <h3 class="text-sm font-semibold text-slate-700 leading-tight mb-auto" x-text="product.name"></h3>
+                                <div class="mt-3">
+                                    <div class="flex justify-between items-end">
+                                        <span class="text-blue-600 font-bold text-lg" x-text="formatNumber(product.price)"></span>
+                                        <span class="text-xs text-slate-400" x-text="'Tồn: ' + product.stock"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="viewMode === 'list'" class="flex flex-col gap-2">
+                        <template x-for="product in filteredProducts" :key="product.id">
+                            <div 
+                                class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:border-blue-400 cursor-pointer transition flex items-center gap-4 group"
+                                @click="addToCart(product)">
+                                <div class="w-12 h-12 bg-slate-100 rounded-lg flex-shrink-0 flex items-center justify-center text-slate-400">
+                                    <i class="fas fa-cube"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="font-bold text-slate-700" x-text="product.name"></h3>
+                                    <p class="text-xs text-slate-400" x-text="'Mã SP: ' + product.id"></p>
+                                </div>
+                                <div class="text-right px-4">
+                                    <p class="text-blue-600 font-bold" x-text="formatNumber(product.price)"></p>
+                                    <p class="text-xs text-slate-500" x-show="product.stock < 10">Sắp hết hàng</p>
+                                </div>
+                                <button class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition flex items-center justify-center">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="filteredProducts.length === 0" class="text-center py-20">
+                        <div class="inline-block p-4 rounded-full bg-slate-100 text-slate-300 mb-4"><i class="fas fa-search text-4xl"></i></div>
+                        <p class="text-slate-500">Không tìm thấy sản phẩm nào</p>
+                    </div>
+                </section>
+
+                <aside class="w-96 bg-white shadow-2xl border-l flex flex-col z-20 no-print">
+                    <div class="p-4 border-b bg-slate-50/50">
+                        <div class="relative">
+                            <div class="flex items-center bg-white border rounded-xl px-3 py-2 shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition">
+                                <i class="fas fa-user text-slate-400 mr-2"></i>
+                                <input 
+                                    type="text" 
+                                    placeholder="Tìm khách hàng (F4)" 
+                                    class="w-full text-sm outline-none bg-transparent font-medium"
+                                    x-model="customerSearch"
+                                    @focus="showCustomerSuggestions = true"
+                                    @keydown.escape="showCustomerSuggestions = false">
+                                <button x-show="customer.id" @click="resetCustomer" class="text-slate-400 hover:text-red-500 px-1"><i class="fas fa-times"></i></button>
+                            </div>
+
+                            <div x-show="customerSearch && showCustomerSuggestions" @click.outside="showCustomerSuggestions = false" class="absolute top-full left-0 w-full bg-white border mt-1 rounded-xl shadow-xl max-h-60 overflow-y-auto z-50">
+                                <template x-for="cust in filteredCustomers" :key="cust.id">
+                                    <div @click="selectCustomer(cust)" class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b last:border-0">
+                                        <div class="flex justify-between items-center">
+                                            <span class="font-bold text-slate-700 text-sm" x-text="cust.name"></span>
+                                            <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full" x-show="cust.debt > 0" x-text="'Nợ: ' + formatNumber(cust.debt)"></span>
+                                        </div>
+                                        <div class="text-xs text-slate-400 mt-0.5" x-text="cust.phone"></div>
+                                    </div>
+                                </template>
+                                <div class="p-2 text-center text-xs text-blue-600 font-bold cursor-pointer hover:underline border-t bg-slate-50">
+                                    <i class="fas fa-plus mr-1"></i> Thêm khách mới
+                                </div>
+                            </div>
+                        </div>
+
+                        <div x-show="customer.id" class="mt-3 flex justify-between items-center bg-blue-50 p-2 rounded-lg border border-blue-100">
+                            <div>
+                                <p class="text-xs text-blue-800 font-bold" x-text="customer.name"></p>
+                                <p class="text-[10px] text-blue-600" x-text="customer.phone"></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] text-slate-500">Nợ hiện tại</p>
+                                <p class="text-xs font-bold text-orange-600" x-text="formatNumber(customer.debt)"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 space-y-3">
+                        <template x-for="(item, index) in cart" :key="index">
+                            <div class="group flex gap-3 items-start p-2 hover:bg-slate-50 rounded-lg transition border border-transparent hover:border-slate-200">
+                                <div class="flex-1">
+                                    <p class="font-bold text-slate-700 text-sm leading-tight mb-1" x-text="item.name"></p>
+                                    <p class="text-xs text-slate-400" x-text="formatNumber(item.price) + ' x ' + item.quantity"></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-slate-800 text-sm" x-text="formatNumber(item.price * item.quantity)"></p>
+                                    <div class="flex items-center justify-end gap-2 mt-1 opacity-0 group-hover:opacity-100 transition">
+                                        <button @click="updateQuantity(item, -1)" class="text-slate-400 hover:text-blue-600"><i class="fas fa-minus-circle"></i></button>
+                                        <button @click="updateQuantity(item, 1)" class="text-slate-400 hover:text-blue-600"><i class="fas fa-plus-circle"></i></button>
+                                        <button @click="removeFromCart(item)" class="text-slate-400 hover:text-red-500 ml-1"><i class="fas fa-trash-alt"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                        
+                        <div x-show="cart.length === 0" class="h-full flex flex-col items-center justify-center text-slate-300">
+                            <i class="fas fa-shopping-basket text-4xl mb-2"></i>
+                            <p class="text-sm">Chưa có sản phẩm</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border-t p-4 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+                        <div class="space-y-2 mb-4">
+                            <div class="flex justify-between text-slate-600 text-sm">
+                                <span>Tổng số lượng</span>
+                                <span class="font-bold" x-text="totalQuantity"></span>
+                            </div>
+                            <div class="flex justify-between items-end">
+                                <span class="text-slate-800 font-bold">Thành tiền</span>
+                                <span class="text-2xl font-black text-blue-700" x-text="formatNumber(subtotal)"></span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="clearCart" class="px-4 py-3 rounded-xl border font-bold text-slate-500 hover:bg-slate-100 hover:text-red-500 transition text-sm">
+                                Hủy (Del)
+                            </button>
+                            <button 
+                                @click="openPaymentModal" 
+                                :disabled="cart.length === 0"
+                                class="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 active:scale-95 transition shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                <span>THANH TOÁN</span>
+                                <span class="bg-blue-500 text-[10px] px-1.5 py-0.5 rounded border border-blue-400">F9</span>
+                            </button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+
+        <div class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col no-print text-white">
+            <div class="p-4 bg-slate-800 flex justify-between items-center shadow-md">
+                <span class="font-bold flex items-center gap-2"><i class="fas fa-robot text-blue-400"></i> AI ASSISTANT</span>
+                <div class="w-2.5 h-2.5 rounded-full bg-green-500 ai-pulse" title="Đang lắng nghe..."></div>
+            </div>
+            
+            <div class="p-3 overflow-y-auto space-y-3 flex-1 custom-scrollbar">
+                <div x-show="aiDrafts.length === 0" class="text-center py-8 opacity-50 text-xs">
+                    <p>Chưa có đơn hàng mới từ Chatbot</p>
+                </div>
+
+                <template x-for="draft in aiDrafts" :key="draft.id">
+                    <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 hover:border-blue-500 transition group relative">
+                        <div class="flex justify-between mb-1">
+                            <span class="text-[10px] font-bold bg-blue-900/50 text-blue-300 px-2 py-0.5 rounded uppercase tracking-wider">Mới</span>
+                            <span class="text-[10px] text-slate-400" x-text="draft.time"></span>
+                        </div>
+                        <p class="text-xs text-slate-300 mb-2 italic border-l-2 border-slate-600 pl-2 my-2" x-text="'Draft: ' + draft.message"></p>
+                        
+                        <div class="space-y-1 mb-3">
+                            <template x-for="item in draft.items">
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-300" x-text="item.quantity + ' x ' + item.name"></span>
+                                    <span class="font-bold text-slate-200" x-text="formatNumber(item.total)"></span>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button @click="rejectDraft(draft)" class="flex-1 py-1.5 bg-slate-700 hover:bg-red-900/50 text-red-300 rounded text-[10px] font-bold uppercase transition">Hủy</button>
+                            <button @click="acceptDraft(draft)" class="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold uppercase transition shadow-lg shadow-blue-900/20">
+                                Nhận Đơn
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showPayModal" x-cloak class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] flex items-center justify-center no-print">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-up">
+            <div class="bg-blue-600 p-4 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fas fa-receipt mr-2"></i>Xác nhận thanh toán</h3>
+                <button @click="closePaymentModal" class="hover:text-red-200"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between items-center text-lg">
+                    <span class="text-slate-600">Tổng tiền hàng:</span>
+                    <span class="font-black text-blue-700 text-2xl" x-text="formatNumber(subtotal)"></span>
+                </div>
+
+                <div class="bg-orange-50 p-3 rounded-xl border border-orange-200 flex items-center gap-3">
+                    <input type="checkbox" id="debtCheck" class="w-5 h-5 text-orange-600 rounded focus:ring-orange-500 cursor-pointer" 
+                        x-model="isDebt" 
+                        :disabled="!customer.id">
+                    <div class="flex-1">
+                        <label for="debtCheck" class="font-bold text-slate-700 cursor-pointer select-none" :class="{'opacity-50': !customer.id}">Ghi nợ vào tài khoản khách</label>
+                        <p x-show="!customer.id" class="text-xs text-red-500 mt-0.5">* Vui lòng chọn khách hàng trước</p>
+                    </div>
+                </div>
+
+                <div x-show="!isDebt" x-transition class="bg-slate-50 p-4 rounded-xl space-y-3 border">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Tiền khách đưa (VND)</label>
+                        <input 
+                            x-ref="amountInput"
+                            type="text" 
+                            inputmode="numeric"
+                            class="w-full text-right font-bold text-lg p-2 border rounded outline-none focus:border-blue-500"
+                            x-model="amountGivenFormatted"
+                            @input="formatAmountGiven">
+                    </div>
+                    <div class="flex justify-between items-center pt-2 border-t">
+                        <span class="font-bold text-slate-600">Tiền thừa trả khách:</span>
+                        <span class="font-bold text-xl" :class="changeAmount < 0 ? 'text-red-500' : 'text-green-600'" x-text="formatNumber(changeAmount)"></span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" id="printCheck" class="w-4 h-4 rounded text-blue-600" x-model="needPrint">
+                    <label for="printCheck" class="text-sm select-none">In hóa đơn ngay sau khi lưu (F8)</label>
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-t flex gap-3">
+                <button @click="closePaymentModal" class="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-200 rounded-xl transition">Quay lại</button>
+                <button @click="finalizeOrder" class="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition flex justify-center items-center gap-2">
+                    <i class="fas fa-check"></i> HOÀN TẤT (Enter)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoice-print-area">
+        <div class="text-center mb-2">
+            <h1 class="text-xl font-bold uppercase tracking-wider">DigiHKD Store</h1>
+            <p class="text-[10px]">ĐC: La Ngâu, Bình Thuận</p>
+            <p class="text-[10px]">Hotline: 0987.654.321</p>
+        </div>
+        <div class="text-center border-b-2 border-dashed border-black pb-2 mb-2">
+            <h2 class="text-lg font-bold uppercase">Hóa Đơn Bán Hàng</h2>
+            <p x-text="new Date().toLocaleString('vi-VN')"></p>
+            <p x-text="'Số HĐ: #' + Math.floor(Math.random() * 100000)"></p>
+        </div>
+        <div class="mb-2 text-[11px]">
+            <p class="flex justify-between"><span>Thu ngân:</span> <span class="font-bold" x-text="employee.name"></span></p>
+            <p class="flex justify-between"><span>Khách hàng:</span> <span class="font-bold" x-text="customer.name || 'Khách lẻ'"></span></p>
+        </div>
+        <table class="w-full text-[11px] mb-2">
+            <thead>
+                <tr class="border-b border-black">
+                    <th class="text-left py-1">MH</th>
+                    <th class="text-center py-1">SL</th>
+                    <th class="text-right py-1">Tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="item in cart">
+                    <tr>
+                        <td class="py-1" x-text="item.name"></td>
+                        <td class="text-center py-1" x-text="item.quantity"></td>
+                        <td class="text-right py-1" x-text="formatNumber(item.price * item.quantity)"></td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+        <div class="border-t border-black pt-2 text-[11px] font-bold space-y-1">
+            <div class="flex justify-between text-sm">
+                <span>TỔNG CỘNG:</span>
+                <span x-text="formatNumber(subtotal)"></span>
+            </div>
+            <div x-show="isDebt" class="text-right italic mt-1">
+                (Đã ghi nợ vào tài khoản)
+            </div>
+            <div x-show="!isDebt">
+                <div class="flex justify-between font-normal">
+                    <span>Khách đưa:</span>
+                    <span x-text="formatNumber(amountGiven)"></span>
+                </div>
+                <div class="flex justify-between font-normal">
+                    <span>Tiền thừa:</span>
+                    <span x-text="formatNumber(changeAmount)"></span>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-6 text-[10px] italic">
+            <p>Cảm ơn quý khách & Hẹn gặp lại!</p>
+            <p>Powered by DigiHKD AI</p>
+        </div>
+    </div>
+
+    <script>
+        function posApp() {
+            return {
+                isLoggedIn: false, // Trạng thái đăng nhập
+                employee: { name: 'Huy (Nhân Viên)', avatar: 'https://ui-avatars.com/api/?name=Huy&background=0D8ABC&color=fff' },
+                
+                viewMode: 'grid', // 'grid' hoặc 'list'
+                searchQuery: '',
+                
+                customerSearch: '',
+                showCustomerSuggestions: false,
+                customer: { id: null, name: '', phone: '', debt: 0 },
+                customers: [
+                    { id: 1, name: 'Anh Hoàng (Công trình)', phone: '0909111222', debt: 1500000 },
+                    { id: 2, name: 'Chị Lan Tạp Hóa', phone: '0909333444', debt: 0 },
+                    { id: 3, name: 'Chú Ba Xe Ôm', phone: '0909555666', debt: 50000 }
+                ],
+                
+                products: [
+                    { id: 1, name: 'Xi măng Hà Tiên PCB40', price: 88000, stock: 200, image: '' },
+                    { id: 2, name: 'Cát xây dựng (khối)', price: 350000, stock: 15, image: '' },
+                    { id: 3, name: 'Thép Pomina phi 16', price: 185000, stock: 50, image: '' },
+                    { id: 4, name: 'Gạch ống 4 lỗ', price: 1200, stock: 5000, image: '' },
+                    { id: 5, name: 'Sơn Dulux Trắng (18L)', price: 2100000, stock: 8, image: '' },
+                    { id: 6, name: 'Bóng đèn LED Rạng Đông 20W', price: 85000, stock: 45, image: '' },
+                ],
+                
+                cart: [],
+                
+                // AI Drafts
+                aiDrafts: [
+                    { id: 101, time: '10:05', message: 'Anh Hoàng lấy 5 bao xi măng, ghi nợ nhé', items: [{id: 1, name: 'Xi măng Hà Tiên', quantity: 5, price: 88000, total: 440000}] }
+                ],
+
+                // Modal Payment Logic
+                showPayModal: false,
+                isDebt: false,
+                needPrint: true,
+                amountGiven: 0,
+                amountGivenFormatted: '',
+
+                init() {
+                    // Tự động focus ô login khi mở trang
+                    // Mặc định chưa login
+                },
+
+                login() {
+                    this.isLoggedIn = true;
+                    // Đợi UI render xong thì focus vào ô tìm kiếm
+                    setTimeout(() => this.$refs.searchInput.focus(), 300);
+                },
+                
+                logout() {
+                    if(confirm('Bạn muốn đăng xuất?')) {
+                        this.isLoggedIn = false;
+                        this.cart = [];
+                        this.resetCustomer();
+                    }
+                },
+
+                get filteredProducts() {
+                    if (!this.searchQuery) return this.products;
+                    const q = this.searchQuery.toLowerCase();
+                    return this.products.filter(p => p.name.toLowerCase().includes(q) || p.id.toString().includes(q));
+                },
+
+                get filteredCustomers() {
+                    const q = this.customerSearch.toLowerCase();
+                    return this.customers.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q));
+                },
+
+                addToCart(product) {
+                    // Hiệu ứng rung nhẹ hoặc âm thanh ở đây nếu cần
+                    const existing = this.cart.find(item => item.id === product.id);
+                    if (existing) {
+                        existing.quantity++;
+                    } else {
+                        this.cart.push({ ...product, quantity: 1 });
+                    }
+                    this.searchQuery = ''; // Reset tìm kiếm để nhập tiếp món khác nhanh hơn
+                    this.$refs.searchInput.focus(); // Focus lại ô tìm kiếm
+                },
+
+                updateQuantity(item, change) {
+                    const idx = this.cart.indexOf(item);
+                    if (idx === -1) return;
+                    
+                    const newQty = item.quantity + change;
+                    if (newQty <= 0) {
+                        if(confirm('Xóa sản phẩm này khỏi giỏ?')) this.cart.splice(idx, 1);
+                    } else {
+                        item.quantity = newQty;
+                    }
+                },
+
+                removeFromCart(item) {
+                    this.cart = this.cart.filter(i => i !== item);
+                },
+
+                clearCart() {
+                    if(this.cart.length > 0 && confirm('Xóa toàn bộ giỏ hàng?')) {
+                        this.cart = [];
+                        this.resetCustomer();
+                    }
+                },
+
+                selectCustomer(cust) {
+                    this.customer = cust;
+                    this.customerSearch = '';
+                    this.showCustomerSuggestions = false;
+                },
+
+                resetCustomer() {
+                    this.customer = { id: null, name: '', phone: '', debt: 0 };
+                    this.customerSearch = '';
+                },
+
+                // Logic AI
+                acceptDraft(draft) {
+                    draft.items.forEach(dItem => {
+                        // Logic đơn giản: tìm theo tên hoặc ID tương ứng
+                        // Thực tế cần mapping chính xác hơn
+                        const product = this.products.find(p => p.id === dItem.id) || this.products[0]; 
+                        this.addToCart({...product, quantity: dItem.quantity});
+                    });
+                    this.aiDrafts = this.aiDrafts.filter(d => d.id !== draft.id);
+                },
+
+                rejectDraft(draft) {
+                    if(confirm('Từ chối đơn nháp này?')) {
+                        this.aiDrafts = this.aiDrafts.filter(d => d.id !== draft.id);
+                    }
+                },
+
+                // Thanh toán
+                openPaymentModal() {
+                    if(this.cart.length === 0) return;
+                    this.showPayModal = true;
+                    this.amountGiven = 0;
+                    this.amountGivenFormatted = '';
+                    // Tự động focus ô tiền khách đưa sau khi mở modal
+                    setTimeout(() => {
+                         if(this.$refs.amountInput) this.$refs.amountInput.focus();
+                    }, 100);
+                },
+
+                closePaymentModal() {
+                    this.showPayModal = false;
+                },
+
+                formatAmountGiven() {
+                    // Xử lý nhập liệu tiền: loại bỏ ký tự không phải số
+                    const val = this.amountGivenFormatted.replace(/\D/g, '');
+                    this.amountGiven = parseInt(val) || 0;
+                    this.amountGivenFormatted = this.formatNumber(this.amountGiven);
+                },
+
+                finalizeOrder() {
+                    // Logic kiểm tra cuối cùng
+                    if (!this.isDebt && this.changeAmount < 0) {
+                        alert('Khách đưa chưa đủ tiền!');
+                        return;
+                    }
+
+                    if (this.needPrint) {
+                        window.print();
+                    }
+
+                    // Giả lập lưu vào DB
+                    alert(`Đơn hàng đã hoàn tất!\nTổng: ${this.formatNumber(this.subtotal)}\nKhách: ${this.customer.name || 'Lẻ'}`);
+                    
+                    // Reset
+                    this.showPayModal = false;
+                    this.cart = [];
+                    this.resetCustomer();
+                    this.isDebt = false;
+                },
+
+                // Helpers
+                get subtotal() {
+                    return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+                },
+                
+                get totalQuantity() {
+                    return this.cart.reduce((sum, item) => sum + item.quantity, 0);
+                },
+
+                get changeAmount() {
+                    return this.amountGiven - this.subtotal;
+                },
+
+                formatNumber(num) {
+                    if(num === undefined || num === null) return '0';
+                    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+                },
+
+                handleShortcuts(e) {
+                    if (e.key === 'F1') { e.preventDefault(); /* Focus Cart if needed */ }
+                    if (e.key === 'F2') { e.preventDefault(); this.$refs.searchInput.focus(); }
+                    if (e.key === 'F4') { e.preventDefault(); document.querySelector('[placeholder*="Tìm khách"]').focus(); }
+                    if (e.key === 'F8') { 
+                        e.preventDefault(); 
+                        if(this.showPayModal) this.needPrint = !this.needPrint; 
+                    }
+                    if (e.key === 'F9') { e.preventDefault(); this.openPaymentModal(); }
+                    if (e.key === 'Enter') {
+                        if (this.showPayModal) {
+                            e.preventDefault();
+                            this.finalizeOrder();
+                        }
+                    }
+                    if (e.key === 'Escape') {
+                        if (this.showPayModal) this.closePaymentModal();
+                    }
+                    if (e.key === 'Delete') {
+                         if (!this.showPayModal) this.clearCart();
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

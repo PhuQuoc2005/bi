@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"  // hoặc "mysql", "sqlite", "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// ===== MODELS =====
+
+// User Model
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  username      String    @unique
+  password      String
+  firstName     String?
+  lastName      String?
+  avatar        String?
+  role          UserRole  @default(USER)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  tasks         Task[]
+  projects      ProjectMember[]
+  comments      Comment[]
+  activities    Activity[]
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+}
+
+// Project Model
+model Project {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  status        ProjectStatus @default(ACTIVE)
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  tasks         Task[]
+  members       ProjectMember[]
+  activities    Activity[]
+  
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+// ProjectMember Model (Many-to-Many relationship)
+model ProjectMember {
+  id            String    @id @default(uuid())
+  userId        String
+  projectId     String
+  role          MemberRole @default(MEMBER)
+  joinedAt      DateTime  @default(now())
+  
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// Task Model
+model Task {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  status        TaskStatus @default(TODO)
+  priority      TaskPriority @default(MEDIUM)
+  dueDate       DateTime?
+  projectId     String
+  assigneeId    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee      User?     @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments      Comment[]
+  activities    Activity[]
+  
+  @@index([projectId])
+  @@index([assigneeId])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Comment Model
+model Comment {
+  id            String    @id @default(uuid())
+  content       String
+  taskId        String
+  userId        String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([taskId])
+  @@map("comments")
+}
+
+// Activity Model (Activity Log)
+model Activity {
+  id            String    @id @default(uuid())
+  type          ActivityType
+  description   String
+  userId        String?
+  projectId     String?
+  taskId        String?
+  createdAt     DateTime  @default(now())
+  
+  // Relations
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task          Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@index([projectId])
+  @@index([taskId])
+  @@map("activities")
+}
+
+enum ActivityType {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  COMMENT_ADDED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  MEMBER_ADDED
+  MEMBER_REMOVED
+}

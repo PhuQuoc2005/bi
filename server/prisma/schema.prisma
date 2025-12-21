@@ -64,6 +64,22 @@ enum ProjectStatus {
   CANCELLED
 }
 
+// Product Model
+model Product {
+  id          String   @id @default(uuid())
+  code        String   @unique // Mã sản phẩm (SP001)
+  name        String
+  price       Decimal
+  stock       Int      @default(0)
+  unit        String?  // Đơn vị (Cái, Hộp...)
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("products")
+}
+
 // ProjectMember Model (Many-to-Many relationship)
 model ProjectMember {
   id            String    @id @default(uuid())

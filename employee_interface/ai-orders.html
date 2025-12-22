@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đơn nháp AI - DigiHKD POS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+    <div class="flex h-screen overflow-hidden">
+        <aside class="w-16 lg:w-20 bg-[#0f172a] text-white flex flex-col items-center py-8 gap-8 shadow-xl z-20 overflow-visible">
+            <div class="text-2xl font-black text-blue-500 mb-4 tracking-tighter cursor-default">POS</div>
+            
+            <a href="index.html" class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-slate-500 hover:text-white transition-all">
+                <i class="fas fa-cash-register text-xl"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg whitespace-nowrap z-50 pointer-events-none transform translate-x-2 group-hover:translate-x-0">
+                    Bán hàng (F1)
+                </span>
+            </a>
+
+            <a href="ai-orders.html" class="group relative flex items-center justify-center w-12 h-12 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/40 transition-all">
+                <i class="fas fa-robot text-xl"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg whitespace-nowrap z-50 pointer-events-none transform translate-x-2 group-hover:translate-x-0">
+                    Đơn nháp AI
+                </span>
+            </a>
+
+            <a href="orders.html" class="group relative flex items-center justify-center w-12 h-12 rounded-2xl text-slate-500 hover:text-white transition-all">
+                <i class="fas fa-file-invoice text-xl"></i>
+                <span class="absolute left-14 bg-slate-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg whitespace-nowrap z-50 pointer-events-none transform translate-x-2 group-hover:translate-x-0">
+                    Lịch sử & Nợ
+                </span>
+            </a>
+
+            <div class="mt-auto pt-6 border-t border-slate-800 w-full flex justify-center">
+                <a href="login.html" class="group relative text-slate-600 hover:text-red-400"><i class="fas fa-power-off text-lg"></i>
+                    <span class="absolute left-10 bottom-0 bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-lg whitespace-nowrap z-50 pointer-events-none">
+                        Đăng xuất
+                    </span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col">
+            <header class="h-16 bg-white border-b px-8 flex items-center justify-between">
+                <h1 class="font-bold text-slate-700 flex items-center gap-2"><i class="fas fa-robot text-blue-600"></i> ĐƠN HÀNG NHÁP TỪ AI</h1>
+            </header>
+            <div class="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-data="{ orders: [{id:1, name:'Anh Hoàng', time:'2 phút trước', msg:'Lấy 5 bao xi măng Hà Tiên, chiều giao.'}, {id:2, name:'Chị Lan', time:'10 phút trước', msg:'2 thùng sơn Dulux trắng.'}] }">
+                <template x-for="order in orders" :key="order.id">
+                    <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <span class="bg-blue-50 text-blue-600 text-[10px] font-black px-2 py-1 rounded-full uppercase">AI Voice</span>
+                            <span class="text-[10px] text-slate-400 font-bold" x-text="order.time"></span>
+                        </div>
+                        <p class="font-bold text-slate-800 mb-2" x-text="order.name"></p>
+                        <p class="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-2xl mb-6" x-text="'&quot;' + order.msg + '&quot;'"></p>
+                        <div class="flex gap-3">
+                            <button class="flex-1 py-3 bg-blue-600 text-white rounded-2xl font-bold text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-200">XÁC NHẬN</button>
+                            <button class="flex-1 py-3 bg-slate-100 text-slate-500 rounded-2xl font-bold text-xs hover:bg-slate-200 transition-all">BỎ QUA</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

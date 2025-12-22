@@ -6,6 +6,7 @@ import fileUpload from 'express-fileupload';
 
 import { createTables } from './utils/createTable.js';
 import routes from './routes/routes.js';
+import productRoutes from './routes/productRoutes.js';
 
 const app = express();
 
@@ -20,6 +21,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+//Mount routes
+app.use('/api/products', productRoutes);
 
 app.use(fileUpload({
     tempFileDir: './uploads',

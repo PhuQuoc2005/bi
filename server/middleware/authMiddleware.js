@@ -8,24 +8,25 @@ config({ path: './config/config.env' });
  * Middleware xác thực JWT Token
  */
 export const verifyToken = (req, res, next) => {
-    // Lấy token từ header Authorization (thường có dạng "Bearer <token>")
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    // 1. Ưu tiên tìm trong Cookie
+    let token = req.cookies.jwt; 
 
+    // 2. Dự phòng tìm trong Header
     if (!token) {
-        return res.status(401).json({ message: "Không tìm thấy mã xác thực (Token)." });
+        const authHeader = req.headers['authorization'];
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        }
     }
 
+    if (!token) return res.status(401).json({ message: "Không tìm thấy Token" });
+
     try {
-        // Giải mã token bằng Secret Key (sử dụng biến môi trường JWT_SECRET)
         const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-        
-        // Lưu thông tin user đã giải mã vào object request để các hàm sau sử dụng
         req.user = decoded;
         next();
     } catch (error) {
-        console.error("JWT Verification Error:", error);
-        return res.status(403).json({ message: "Mã xác thực không hợp lệ hoặc đã hết hạn." });
+        return res.status(403).json({ message: "Token không hợp lệ" });
     }
 };
 

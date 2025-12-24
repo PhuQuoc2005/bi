@@ -28,6 +28,9 @@ const database = new Pool({
     // ssl: process.env.NODE_ENV === 'production' 
     //     ? { rejectUnauthorized: false, require: true } 
     //     : { require: true}
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
 });
 
 try {

@@ -119,7 +119,34 @@ export const login = async (req, res) => {
     }
 };
 
-export const logout = (_, res) => {
-    res.cookie('jwt', '', { matxAge: 0 });
-    res.status(200).json({ message: 'Logged out successfully' });
+export const logout = (req, res) => {
+    try {
+        // Cấu hình giống hệt lúc tạo (quan trọng nhất là secure và sameSite)
+        // Nếu bạn chạy localhost, secure phải là false
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        const cookieOptions = {
+            httpOnly: true,
+            secure: isProduction, 
+            sameSite: 'lax',
+            path: '/' // <-- QUAN TRỌNG: Đảm bảo xóa ở root
+        };
+
+        // 1. Xóa cookie chính 'jwt'
+        res.clearCookie('jwt', cookieOptions);
+        
+        // 2. Xóa các cookie 'lạ' mà bạn thấy (token, role) để chắc chắn
+        res.clearCookie('token', cookieOptions);
+        res.clearCookie('role', cookieOptions);
+
+        // 3. Biện pháp mạnh: Set đè lên cookie cũ với ngày hết hạn trong quá khứ
+        res.cookie('jwt', '', { ...cookieOptions, expires: new Date(0) });
+        res.cookie('token', '', { ...cookieOptions, expires: new Date(0) });
+        res.cookie('role', '', { ...cookieOptions, expires: new Date(0) });
+
+        res.status(200).json({ success: true, message: "Đã xóa toàn bộ cookie" });
+    } catch (error) {
+        console.error("Logout Error:", error);
+        res.status(200).json({ success: true, message: "Logout (Force)" });
+    }
 };

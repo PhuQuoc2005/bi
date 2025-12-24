@@ -87,3 +87,31 @@ export const createOrder = async (req, res) => {
         client.release();
     }
 };
+
+export const getAllOrders = async (req, res) => {
+    try {
+        const ownerId = req.user.owner_id || req.user.id; // Lấy đơn hàng của Owner đó
+
+        // Query lấy danh sách đơn hàng, sắp xếp mới nhất lên đầu
+        // Có thể JOIN thêm bảng customer nếu cần hiển thị tên khách chi tiết hơn
+        const query = `
+            SELECT 
+                so.*, 
+                u.full_name as created_by_name
+            FROM sales_order so
+            LEFT JOIN users u ON so.created_by_user_id = u.id
+            WHERE so.owner_id = $1
+            ORDER BY so.created_at DESC
+        `;
+
+        const { rows } = await database.query(query, [ownerId]);
+
+        return res.status(200).json({
+            success: true,
+            data: rows
+        });
+    } catch (error) {
+        console.error("Get All Orders Error:", error);
+        return res.status(500).json({ message: "Lỗi khi tải danh sách đơn hàng" });
+    }
+};

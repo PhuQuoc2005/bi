@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Lock, Phone, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils'; // Sử dụng hàm cn từ utils.ts của bạn
+import { authService } from '@/services/auth.service';
+import Cookies from 'js-cookie';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,46 +27,37 @@ export default function LoginPage() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+  e.preventDefault();
+  setIsLoading(true);
+  setError('');
 
-    try {
-      // Gọi API Login dựa trên server/routes/userRoutes.js
-      // Lưu ý: Cần thay đổi URL này nếu backend chạy ở port khác hoặc đã cấu hình proxy
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/user/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          phone_number: formData.phone_number,
-          password: formData.password,
-        }),
-      });
+  try {
+    // GỌI QUA SERVICE (Không cần lo về URL nữa)
+    const data = await authService.login(formData.phone_number, formData.password);
 
-      const data = await response.json();
+    // Xử lý Role (như cũ)
+    let roleName = 'EMPLOYEE';
+    if (data.role_id === 1 || data.role_id === '1') roleName = 'ADMIN';
+    if (data.role_id === 2 || data.role_id === '2') roleName = 'OWNER';
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Đăng nhập thất bại');
-      }
+    Cookies.set('token', 'true', { expires: 1 });
+    Cookies.set('role', roleName, { expires: 1 });
+    localStorage.setItem('user', JSON.stringify(data));
 
-      // Xử lý khi đăng nhập thành công
-      // Ví dụ: Lưu thông tin user vào localStorage hoặc Context
-      // Backend của bạn đã set cookie 'jwt' (trong UserController -> generateToken), 
-      // nhưng nếu cần lưu info user ở client:
-      localStorage.setItem('user', JSON.stringify(data));
+    // Điều hướng
+    if (roleName === 'ADMIN') router.push('/admin/dashboard');
+    else if (roleName === 'OWNER') router.push('/dashboard');
+    else router.push('/pos');
 
-      // Chuyển hướng về trang chủ hoặc dashboard
-      router.push('/');
-      
-    } catch (err: any) {
-      setError(err.message || 'Có lỗi xảy ra, vui lòng thử lại.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    router.refresh();
+
+  } catch (err: any) {
+    // Lấy message lỗi từ axios response
+    setError(err.response?.data?.message || 'Đăng nhập thất bại');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">

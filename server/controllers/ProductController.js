@@ -44,31 +44,25 @@ export const getProductById = async (req, res) => {
 };
 
 export const createProduct = async (req, res) => {
-  const { name, category, price, stock, images } = req.body;
-  const owner_id = req.user.userId; // SỬA: id -> userId
+  // 1. Thêm code và unit vào destructuring
+  const { name, category, price, stock, images, code, unit } = req.body;
+  const owner_id = req.user.userId;
 
   try {
-    // --- XỬ LÝ LỖI JSON ---
-    // Postgres cột JSON yêu cầu giá trị phải là JSON hợp lệ (VD: "null", "chuỗi", "{}").
-    // Chuỗi rỗng "" hoặc text trần sẽ gây lỗi "invalid input syntax for type json".
-    
-    let imageToSave = null; // Mặc định là null (JSON chấp nhận null)
-    
+    let imageToSave = null;
     if (images && images.trim() !== '') {
-        // Nếu có link ảnh, dùng JSON.stringify để bọc nó thành chuỗi JSON hợp lệ.
-        // Ví dụ: "http://anh.com" -> "\"http://anh.com\""
         imageToSave = JSON.stringify(images);
     }
-    // ---------------------
 
+    // 2. Cập nhật câu SQL INSERT
     const sql = `
-      INSERT INTO product (owner_id, name, category, price, stock, images, is_active, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      INSERT INTO product (owner_id, name, category, price, stock, images, is_active, code, unit, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
       RETURNING *;
     `;
     
-    // Truyền imageToSave đã xử lý vào vị trí $6
-    const values = [owner_id, name, category, price, stock, imageToSave, true];
+    // 3. Thêm tham số vào mảng values
+    const values = [owner_id, name, category, price, stock, imageToSave, true, code, unit];
 
     const result = await db.query(sql, values);
 
@@ -85,8 +79,9 @@ export const createProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   const { id } = req.params;
-  const owner_id = req.user.userId; // SỬA: id -> userId
-  const { name, category, price, stock, images, is_active } = req.body;
+  const owner_id = req.user.userId;
+  // 1. Thêm code, unit vào destructuring
+  const { name, category, price, stock, images, is_active, code, unit } = req.body;
 
   try {
     const checkProduct = await db.query('SELECT * FROM product WHERE id = $1 AND owner_id = $2', [id, owner_id]);
@@ -94,22 +89,17 @@ export const updateProduct = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm' });
     }
 
-    // --- XỬ LÝ LỖI JSON KHI UPDATE ---
-    let imageToSave = checkProduct.rows[0].images; // Mặc định giữ cái cũ
-
-    if (images !== undefined) { // Nếu frontend có gửi trường images lên
-        if (images === null || images.trim() === '') {
-            imageToSave = null;
-        } else {
-            imageToSave = JSON.stringify(images);
-        }
+    let imageToSave = checkProduct.rows[0].images;
+    if (images !== undefined) {
+        if (images === null || images.trim() === '') imageToSave = null;
+        else imageToSave = JSON.stringify(images);
     }
-    // ---------------------------------
 
+    // 2. Cập nhật SQL UPDATE
     const sql = `
       UPDATE product 
-      SET name = $1, category = $2, price = $3, stock = $4, images = $5, is_active = $6
-      WHERE id = $7
+      SET name = $1, category = $2, price = $3, stock = $4, images = $5, is_active = $6, code = $7, unit = $8
+      WHERE id = $9
       RETURNING *;
     `;
 
@@ -119,8 +109,10 @@ export const updateProduct = async (req, res) => {
       category || oldData.category,
       price || oldData.price,
       stock || oldData.stock,
-      imageToSave, // Dùng biến đã xử lý
+      imageToSave,
       is_active !== undefined ? is_active : oldData.is_active,
+      code || oldData.code, // Cập nhật code
+      unit || oldData.unit, // Cập nhật unit
       id
     ];
 

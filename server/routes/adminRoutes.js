@@ -8,5 +8,7 @@ const router = express.Router();
 router.get('/owners', verifyToken, isAdmin, AdminController.getAllOwners);
 router.put('/owners/status', verifyToken, isAdmin, AdminController.toggleOwnerStatus);
 router.post('/plans', verifyToken, isAdmin, AdminController.createPlan);
+router.post('/owners', verifyToken, isAdmin, AdminController.createOwner);
+router.put('/owners/:id', verifyToken, isAdmin, AdminController.updateOwner);
 
 export default router;

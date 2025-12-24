@@ -25,18 +25,9 @@ const database = new Pool({
     password: process.env.PGPASSWORD,
     port: process.env.PGPORT || 5432,
     // Tắt hoàn toàn SSL khi ở môi trường phát triển
-    ssl: process.env.NODE_ENV === 'production' 
-        ? { rejectUnauthorized: false} 
-        : { require: true},
-
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-});
-
-// BẮT BUỘC: handle error để app KHÔNG CRASH
-database.on('error', (err) => {
-    console.error('PostgreSQL Pool Error:', err.message);
+    // ssl: process.env.NODE_ENV === 'production' 
+    //     ? { rejectUnauthorized: false, require: true } 
+    //     : { require: true}
 });
 
 try {

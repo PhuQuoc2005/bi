@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Menu, Mic, Bell, FileText, Save, Users } from 'lucide-react';
-import { Sidebar } from '@/components/layout/Sidebar';
+import  Sidebar  from '@/components/layout/Sidebar';
 import { Dashboard } from '@/components/features/Dashboard';
 import { POS } from '@/components/features/POS';
 import { InventoryManager } from '@/components/features/Inventory';

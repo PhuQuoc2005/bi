@@ -1,146 +1,117 @@
 'use client';
 
 import { useState } from 'react';
-import AccountOwnerTable, { Owner } from '@/components/admin/AccountOwnerTable'; // Import interface Owner
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/axios';
 import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+// Import components
+import AccountOwnerTable, { Owner } from '@/components/admin/AccountOwnerTable';
+import OwnerForm from '@/components/admin/OwnerForm';
 
 export default function AccountOwnerPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingOwner, setEditingOwner] = useState<Owner | null>(null); // Lưu owner đang sửa
   const queryClient = useQueryClient();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedOwner, setSelectedOwner] = useState<Owner | null>(null);
 
-  // State form
-  const [formData, setFormData] = useState({
-    full_name: '',
-    phone_number: '',
-    password: ''
-  });
-
-  // 1. Hàm mở modal
-  const handleOpenModal = (owner?: Owner) => {
-    if (owner) {
-      // Chế độ Edit
-      setEditingOwner(owner);
-      setFormData({
-        full_name: owner.full_name,
-        phone_number: owner.phone_number,
-        password: '' // Không hiển thị mật khẩu cũ
-      });
-    } else {
-      // Chế độ Create
-      setEditingOwner(null);
-      setFormData({ full_name: '', phone_number: '', password: '' });
-    }
-    setIsModalOpen(true);
-  };
-
-  // 2. Mutation chung (Tự check để gọi Create hay Update)
-  const submitMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      if (editingOwner) {
-        // Gọi API Update
-        return api.put(`/admin/owners/${editingOwner.id}`, data);
-      } else {
-        // Gọi API Create
-        return api.post('/admin/owners', data);
-      }
+  // 1. Mutation Tạo mới
+  const createMutation = useMutation({
+    mutationFn: async (newData: any) => {
+      return api.post('/admin/owners', newData);
     },
     onSuccess: () => {
-      toast.success(editingOwner ? 'Cập nhật thành công!' : 'Tạo mới thành công!');
-      setIsModalOpen(false);
+      toast.success('Thêm chủ cửa hàng thành công!');
+      handleCloseDialog();
       queryClient.invalidateQueries({ queryKey: ['admin-owners'] });
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Có lỗi xảy ra');
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Lỗi khi tạo mới');
     }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    submitMutation.mutate(formData);
+  // 2. Mutation Cập nhật
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+        // API: PUT /admin/owners/:id
+      return api.put(`/admin/owners/${selectedOwner?.id}`, data);
+    },
+    onSuccess: () => {
+      toast.success('Cập nhật thông tin thành công!');
+      handleCloseDialog();
+      queryClient.invalidateQueries({ queryKey: ['admin-owners'] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Lỗi khi cập nhật');
+    }
+  });
+
+  // Xử lý khi submit form
+  const handleSubmit = (formData: any) => {
+    if (selectedOwner) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  // Mở Dialog để thêm mới
+  const handleOpenCreate = () => {
+    setSelectedOwner(null);
+    setIsDialogOpen(true);
+  };
+
+  // Mở Dialog để sửa (được gọi từ Table)
+  const handleOpenEdit = (owner: Owner) => {
+    setSelectedOwner(owner);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setSelectedOwner(null);
   };
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Quản Lý Tài Khoản Chủ Sở Hữu</h1>
-        <Button 
-          onClick={() => handleOpenModal()} 
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          + Thêm Tài Khoản
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Quản lý Chủ Cửa Hàng</h1>
+          <p className="text-slate-500">Danh sách các tài khoản Owner trong hệ thống</p>
+        </div>
+        
+        <Button onClick={handleOpenCreate} className="bg-blue-600 hover:bg-blue-700">
+          <Plus size={18} className="mr-2" /> Thêm Owner
         </Button>
       </div>
 
-      {/* Truyền hàm handleOpenModal xuống Table để nút "Sửa" gọi */}
-      <AccountOwnerTable onEdit={handleOpenModal} />
+      {/* Bảng dữ liệu - Truyền hàm onEdit xuống */}
+      <AccountOwnerTable onEdit={handleOpenEdit} />
 
-      {/* --- MODAL (Dùng chung cho Thêm & Sửa) --- */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                {editingOwner ? 'Cập Nhật Thông Tin' : 'Thêm Chủ Sở Hữu Mới'}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Họ và tên</Label>
-                <Input
-                  required
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Số điện thoại</Label>
-                <Input
-                  required
-                  value={formData.phone_number}
-                  onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>
-                  {editingOwner ? 'Mật khẩu mới (Để trống nếu không đổi)' : 'Mật khẩu'}
-                </Label>
-                <Input
-                  type="password"
-                  // Nếu là Edit thì không bắt buộc, nếu Create thì bắt buộc
-                  required={!editingOwner}
-                  minLength={6}
-                  placeholder={editingOwner ? '********' : 'Nhập mật khẩu...'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                  Hủy
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="bg-blue-600 hover:bg-blue-700"
-                  disabled={submitMutation.isPending}
-                >
-                  {submitMutation.isPending ? 'Đang xử lý...' : (editingOwner ? 'Lưu Thay Đổi' : 'Tạo Mới')}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Dialog Form */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+                {selectedOwner ? 'Cập nhật thông tin' : 'Thêm Chủ Cửa Hàng Mới'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <OwnerForm 
+            initialData={selectedOwner}
+            onSubmit={handleSubmit}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            onCancel={handleCloseDialog}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

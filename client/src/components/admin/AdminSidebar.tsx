@@ -1,54 +1,75 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { 
+  LayoutDashboard, 
+  Users, 
+  Settings, 
+  FileBarChart, 
+  CreditCard, 
+  LogOut 
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { authService } from '@/services/auth.service';
+import { useRouter } from 'next/navigation';
 
-export default function AdminSidebar() {
-  const [isOpen, setIsOpen] = useState(true);
+const menuItems = [
+  { href: '/admin', label: 'Tổng quan', icon: LayoutDashboard },
+  { href: '/admin/account-owner', label: 'Quản lý Chủ shop', icon: Users },
+  { href: '/admin/subscription-plans', label: 'Gói dịch vụ', icon: CreditCard },
+  { href: '/admin/reports-analytics', label: 'Báo cáo & Phân tích', icon: FileBarChart },
+  { href: '/admin/system-config', label: 'Cấu hình hệ thống', icon: Settings },
+];
 
-  const menuItems = [
-    { name: 'Dashboard', path: '/admin', icon: '📊' },
-    { name: 'Quản Lý Tài Khoản', path: '/admin/account-owner', icon: '👤' },
-    { name: 'Báo Cáo & Phân Tích', path: '/admin/reports-analytics', icon: '📈' },
-    { name: 'Quản Lý Gói Đăng Ký', path: '/admin/subscription-plans', icon: '💳' },
-    { name: 'Cấu Hình Hệ Thống', path: '/admin/system-config', icon: '⚙️' },
-  ];
+export const AdminSidebar = () => {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+      await authService.logout();
+      router.push('/login');
+  };
 
   return (
-    <aside className={`${isOpen ? 'w-64' : 'w-20'} bg-gray-900 text-white transition-all duration-300 flex flex-col`}>
-      {/* Logo */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700">
-        {isOpen && <h1 className="text-xl font-bold">BizFlow Admin</h1>}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 hover:bg-gray-800 rounded-lg"
-        >
-          ☰
-        </button>
+    <aside className="w-64 bg-slate-900 text-white min-h-screen flex flex-col fixed left-0 top-0 z-50">
+      {/* Logo Area */}
+      <div className="h-16 flex items-center px-6 border-b border-slate-700">
+        <div className="font-bold text-xl tracking-wider text-blue-400">BizFlow Admin</div>
       </div>
 
       {/* Menu Items */}
-      <nav className="flex-1 p-4 space-y-2">
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <span className="text-xl">{item.icon}</span>
-            {isOpen && <span className="text-sm font-medium">{item.name}</span>}
-          </Link>
-        ))}
+      <nav className="flex-1 py-6 px-3 space-y-1">
+        {menuItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
+                isActive 
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30" 
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              )}
+            >
+              <item.icon size={20} className={isActive ? "text-white" : "text-slate-400 group-hover:text-white"} />
+              <span className="font-medium text-sm">{item.label}</span>
+            </Link>
+          );
+        })}
       </nav>
 
-      {/* Footer */}
-      {isOpen && (
-        <div className="p-4 border-t border-gray-700">
-          <button className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium">
-            Đăng Xuất
-          </button>
-        </div>
-      )}
+      {/* Footer / Logout */}
+      <div className="p-4 border-t border-slate-700">
+        <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors"
+        >
+          <LogOut size={20} />
+          <span className="font-medium text-sm">Đăng xuất</span>
+        </button>
+      </div>
     </aside>
   );
-}
+};

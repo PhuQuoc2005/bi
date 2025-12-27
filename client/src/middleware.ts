@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
 
   // --- LOGIC 2: ĐÃ ĐĂNG NHẬP MÀ VÀO TRANG LOGIN ---
   if (isAuthRoute) {
-    if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', request.url));
     if (role === 'OWNER') return NextResponse.redirect(new URL('/dashboard', request.url));
     if (role === 'EMPLOYEE') return NextResponse.redirect(new URL('/pos', request.url));
     // Fallback nếu không có role hợp lệ
@@ -36,7 +36,7 @@ export function middleware(request: NextRequest) {
 
   // ADMIN: Không được vào trang Shop (Dashboard/POS)
   if (role === 'ADMIN' && (isOwnerRoute || isPosRoute)) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+    return NextResponse.redirect(new URL('/admin', request.url));
   }
 
   // EMPLOYEE: Chỉ được vào POS, không được vào Dashboard quản lý hay Admin

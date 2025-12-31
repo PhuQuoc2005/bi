@@ -4,6 +4,9 @@ import React from 'react';
 import { TrendingUp, Users, AlertCircle, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
+
+import AIOrderCreator from '@/components/AIOrderCreator';
+
 // import { REVENUE_DATA } from '@/lib/constants'; // Tạm đóng để dùng mock data bên dưới
 
 // Mock data tạm thời để biểu đồ hiển thị được ngay
@@ -116,6 +119,10 @@ export default function DashboardPage() {
                <button className="w-full mt-4 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 font-medium">Xem tất cả</button>
           </div>
       </div>
+          <div className="min-h-screen py-10">
+      <AIOrderCreator />
+    </div>L
+
     </div>
   );
 }

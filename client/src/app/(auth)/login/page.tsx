@@ -42,6 +42,9 @@ export default function LoginPage() {
 
     Cookies.set('token', 'true', { expires: 1 });
     Cookies.set('role', roleName, { expires: 1 });
+    if (data.accessToken) {
+          localStorage.setItem('accessToken', data.accessToken);
+      }
     localStorage.setItem('user', JSON.stringify(data));
 
     // Điều hướng

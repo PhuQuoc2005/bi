@@ -71,6 +71,7 @@ const UOM_GROUP_MAPPING = {
 export const InventoryManager = () => {
     const queryClient = useQueryClient();
     const barcodeInputRef = useRef<HTMLInputElement>(null);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
@@ -96,13 +97,6 @@ export const InventoryManager = () => {
 
     const [isManualCategory, setIsManualCategory] = useState(false);
 
-    // Khai báo query để lấy dữ liệu (Sử dụng Tanstack Query)
-    const { data: productUoms = [], isLoading: isLoadingUoms } = useQuery({
-        queryKey: ['product-uoms', formData.id],
-        queryFn: () => productService.getProductUoms(formData.id!),
-        enabled: !!formData.id, // Chỉ chạy khi đã xác định được productId
-    });
-
     // Tự động quản lý trạng thái loading với useQuery
     const { data: products = [], isLoading } = useQuery({
         queryKey: ['products'],
@@ -111,7 +105,24 @@ export const InventoryManager = () => {
 
     const { data: globalUoms = [] } = useQuery({
         queryKey: ['all-uoms'],
-        queryFn: productService.getAllUoms,
+        queryFn: ownerService.getAllUoms,
+    });
+
+    // Lấy toàn bộ đơn vị của cửa hàng ngay từ đầu
+    const { data: storeUoms = [] } = useQuery({
+        queryKey: ['store-uoms'],
+        queryFn: async () => {
+            return ownerService.getStoreUoms(); // Bạn cần thêm hàm này vào owner.service.ts
+        },
+    });
+
+    // Lấy đơn vị tính của sản phẩm khi formData.id thay đổi
+    const { data: productUoms = [], isLoading: isLoadingUoms } = useQuery({
+        queryKey: ['product-uoms', formData.id],
+        queryFn: async () => {
+            return ownerService.getProductUoms(formData.id!);
+        },
+        enabled: !!formData.id && formData.id !== undefined,
     });
 
     // Mutation để Thêm/Sửa
@@ -141,51 +152,62 @@ export const InventoryManager = () => {
         }
     });
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const userStr = localStorage.getItem('user'); // Hoặc key bạn dùng để lưu user
+            if (userStr) {
+                setCurrentUser(JSON.parse(userStr));
+            }
+        }
+    }, []);
+
     // Tìm kiếm sản phẩm khi người dùng nhập/quét mã vạch
     useEffect(() => {
-        // TRƯỜNG HỢP 1: Ô mã vạch trống hoặc bị xóa hết
-        if (!formData.code || formData.code.trim() === "") {
+        // 1. Lấy mã và xóa bỏ khoảng trắng/ký tự xuống dòng từ máy quét
+        const searchCode = formData.code?.trim();
+
+        // 2. Nếu ô nhập trống, reset về trạng thái sản phẩm mới
+        if (!searchCode) {
             setIsNewProduct(true);
             setFormData(prev => ({
                 ...prev,
                 id: undefined,
                 name: '',
                 category: '',
-                unit: '',
                 price: 0,
                 stock: 0
             }));
-            return; // Dừng xử lý
+            return;
         }
 
-        // Tìm sản phẩm khớp với mã đã nhập
-        const foundProduct = products.find((p: any) => p.code === formData.code);
+        // 3. Chỉ tìm kiếm khi danh sách sản phẩm đã tải xong
+        if (products.length > 0) {
+            const foundProduct = products.find((p: any) => p.code === searchCode);
 
-        if (foundProduct) {
-            // TRƯỜNG HỢP 2: TÌM THẤY SẢN PHẨM KHỚP MÃ
-            setIsNewProduct(false);
-            setFormData(prev => ({
-                ...prev,
-                id: foundProduct.id,
-                name: foundProduct.name,
-                category: foundProduct.category,
-                unit: foundProduct.unit,
-                price: foundProduct.price,
-                stock: foundProduct.stock
-            }));
-            toast.success(`Đã nhận diện: ${foundProduct.name}`);
-        } else {
-            // TRƯỜNG HỢP 3: CÓ NHẬP MÃ NHƯNG KHÔNG KHỚP (Hoặc vừa xóa 1 ký tự làm mã bị sai)
-            // Cần reset sạch thông tin để tránh hiển thị nhầm dữ liệu của SP trước đó
-            setIsNewProduct(true);
-            setFormData(prev => ({
-                ...prev,
-                id: undefined,
-                name: '',      // Xóa tên
-                category: '',  // Xóa danh mục
-                price: 0,     // Reset giá bán
-                stock: 0       // Reset tồn kho
-            }));
+            if (foundProduct) {
+                setIsNewProduct(false);
+                setFormData(prev => ({
+                    ...prev,
+                    id: foundProduct.id, // Gán ID từ DB vào đây
+                    name: foundProduct.name,
+                    category: foundProduct.category,
+                    unit: foundProduct.unit || 'Cái',
+                    price: Number(foundProduct.price || 0),
+                    stock: Number(foundProduct.stock || 0)
+                }));
+                toast.success(`Đã nhận diện: ${foundProduct.name}`);
+            } else {
+                // Nếu không tìm thấy, coi như là sản phẩm mới nhưng KHÔNG reset mã đang gõ
+                setIsNewProduct(true);
+                setFormData(prev => ({
+                    ...prev,
+                    id: undefined,
+                    name: '',
+                    category: '',
+                    price: 0,
+                    stock: 0
+                }));
+            }
         }
     }, [formData.code, products]);
 
@@ -351,7 +373,7 @@ export const InventoryManager = () => {
                             ) : (
                                 products.map((p) => (
                                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 text-slate-500 font-mono">#{p.code}</td>
+                                        <td className="p-4 text-slate-500 font-mono">{p.code}</td>
                                         <td className="p-4 font-medium text-slate-800">{p.name}</td>
                                         <td className="p-4 text-slate-600">{p.category}</td>
                                         <td className="p-4 text-right font-medium text-slate-700">
@@ -463,9 +485,9 @@ export const InventoryManager = () => {
                                             required
                                         />
                                         {!isNewProduct && formData.id && (
-                                            <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
+                                            <div className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
                                                 <Check size={12}/> Đã khớp với sản phẩm trong kho
-                                            </p>
+                                            </div>
                                         )}
                                     </div>
 
@@ -621,8 +643,19 @@ export const InventoryManager = () => {
                                                         }}
                                                     >
                                                         <option value="">Chọn đơn vị</option>
-                                                        <optgroup label="Đơn vị hệ thống">
-                                                            {globalUoms.map((u: any) => (
+                                                        {/* Nhóm 1: Đơn vị do chủ cửa hàng tự định nghĩa */}
+                                                        <optgroup label="👤 Đơn vị của tôi">
+                                                            {globalUoms
+                                                                .filter((u: any) => u.owner_id === currentUser.id)
+                                                                .map((u: any) => (
+                                                                    <option key={u.id} value={u.id}>{u.uom_name}</option>
+                                                                ))
+                                                            }
+                                                        </optgroup>
+                                                        <optgroup label="📦 Đơn vị hệ thống">
+                                                            {globalUoms
+                                                                .filter((u: any) => u.owner_id !== currentUser.id)
+                                                                .map((u: any) => (
                                                                 <option key={u.id} value={u.id}>{u.uom_name}</option>
                                                             ))}
                                                         </optgroup>
@@ -743,8 +776,8 @@ export const InventoryManager = () => {
                                             <div className="text-slate-400"><RefreshCw size={14} /></div>
                                             <div>
                                                 <div className="text-[12px] font-bold text-slate-400 uppercase leading-none mb-0.5">Giá hiện tại</div>
-                                                <div className="text-xm font-black text-slate-600">
-                                                    {currentSellingPrice.toLocaleString('vi-VN')} đ
+                                                <div className="text-xm font-black text-slate-600 suppressHydrationWarning">
+                                                    {currentSellingPrice.toLocaleString('vi-VN')} VNĐ
                                                 </div>
                                             </div>
                                         </div>
@@ -754,7 +787,7 @@ export const InventoryManager = () => {
                                             <div>
                                                 <div className="text-[12px] font-bold text-blue-400 uppercase leading-none mb-0.5">Vốn 1 {formData.unit}</div>
                                                 <div className="text-xm font-black text-blue-700">
-                                                    {unitCost.toLocaleString('vi-VN')} đ
+                                                    {unitCost.toLocaleString('vi-VN')} VNĐ
                                                 </div>
                                             </div>
                                         </div>

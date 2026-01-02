@@ -53,15 +53,4 @@ export const productService = {
   delete: async (id: string | number) => {
     return api.delete(`/products/${id}`);
   },
-
-  // Lấy tất cả đơn vị tính (UoM)
-  getAllUoms: async () => {
-      const response = await api.get('/products/uoms/all');
-      return response.data;
-  },
-  // Lấy đơn vị tính của sản phẩm
-  getProductUoms: async (productId: String) => {
-    const response = await api.get(`/products/${productId}/uoms`);
-    return response.data;
-  },
 };

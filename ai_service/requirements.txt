@@ -5,3 +5,5 @@ python-dotenv
 requests
 google-generativeai  # Dùng cho Gemini như trong requirement
 chromadb             # Cho RAG
+openai
+python-multipart

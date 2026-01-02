@@ -12,5 +12,10 @@ export const orderService = {
     const response = await api.get('/orders');
     // Kiểm tra cấu trúc trả về (response.data.data hoặc response.data)
     return (response.data as any).data || response.data;
-  }
+  },
+
+  analyzeOrder: async (message: string) => {
+    const response = await api.post('/orders/ai/draft', { message });
+    return response.data; // Hoặc response.data.data tùy cấu trúc
+}
 };

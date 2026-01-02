@@ -1,5 +1,6 @@
 import AIService from '../services/AIService.js';
 import db from '../database/db.js'; // Sử dụng kết nối PG của bạn
+import fs from 'fs';
 
 export const createDraftOrderFromAI = async (req, res) => {
     try {
@@ -116,5 +117,43 @@ export const createDraftOrderFromAI = async (req, res) => {
             success: false, 
             message: "Lỗi xử lý AI: " + error.message 
         });
+    }
+};
+
+export const transcribeAudio = async (req, res) => {
+    let tempFilePath = null; // Biến lưu đường dẫn để xóa sau này
+
+    try {
+        console.log("🎤 [Controller] Bắt đầu xử lý transcribe...");
+
+        if (!req.files || !req.files.audio) {
+            return res.status(400).json({ success: false, message: "Không có file ghi âm" });
+        }
+        
+        const audioFile = req.files.audio;
+        tempFilePath = audioFile.tempFilePath; // Lưu lại đường dẫn tạm
+
+        console.log(`📂 [Controller] File tạm tại: ${tempFilePath}`);
+
+        // Gọi Service (Code cũ)
+        const text = await AIService.transcribeAudio(tempFilePath);
+        
+        console.log("✅ [Controller] Kết quả:", text);
+        return res.status(200).json({ success: true, text: text });
+
+    } catch (error) {
+        console.error("🔥 [Controller] Lỗi:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Lỗi Server: " + (error.message || "Không xác định") 
+        });
+    } finally {
+        // --- ĐOẠN CODE MỚI: DỌN DẸP FILE RÁC ---
+        if (tempFilePath) {
+            fs.unlink(tempFilePath, (err) => {
+                if (err) console.error("⚠️ Không thể xóa file tạm:", err);
+                else console.log("🗑️ Đã xóa file tạm:", tempFilePath);
+            });
+        }
     }
 };

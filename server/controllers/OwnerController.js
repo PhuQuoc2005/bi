@@ -77,6 +77,98 @@ export const createEmployee = async (req, res) => {
     }
 };
 
+
+// Lấy tất cả đơn vị tính (UoM) cho Owner
+export const getAllUoms = async (req, res) => {
+    const userId = req.user.userId; 
+
+    try {
+        const query = `
+            SELECT id, owner_id, uom_name
+            FROM uom 
+            WHERE owner_id = $1 OR owner_id IS NULL 
+            ORDER BY 
+                CASE WHEN owner_id IS NULL THEN 0 ELSE 1 END, -- Hiện đơn vị hệ thống lên trước
+                uom_name ASC
+        `;
+        
+        const result = await database.query(query, [userId]);
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error("Error in getAllUoms:", error);
+        res.status(500).json({ message: "Không thể lấy danh sách đơn vị tính" });
+    }
+};
+
+// Lấy danh sách UoM thuộc về cửa hàng của Owner
+export const getStoreUoms = async (req, res) => {
+    const owner_id = req.user.userId; // Lấy từ token
+    try {
+        // Lấy tất cả UoM thuộc về các sản phẩm của Owner này
+        const query = `
+            SELECT DISTINCT u.uom_name, pu.conversion_factor, u.id as uom_id
+            FROM product_uom pu
+            JOIN uom u ON pu.uom_id = u.id
+            JOIN product p ON pu.product_id = p.id
+            WHERE p.owner_id = $1
+        `;
+        const result = await database.query(query, [owner_id]);
+        res.status(200).json({ success: true, data: result.rows });
+    } catch (error) {
+        console.error("Get Store Uoms Error:", error);
+        res.status(500).json({ success: false, message: 'Lỗi lấy danh sách đơn vị' });
+    }
+};
+
+// Lấy danh sách UoM của sản phẩm
+export const getProductUoms = async (req, res) => {
+    const { productId } = req.params;
+
+    try {
+        // Truy vấn lấy danh sách đơn vị quy đổi của sản phẩm
+        const query = `
+            SELECT 
+                pu.id as product_uom_id,
+                u.id as uom_id,
+                u.uom_name,
+                pu.conversion_factor,
+                pu.is_base_unit,
+                pu.selling_price
+            FROM product_uom pu
+            JOIN uom u ON pu.uom_id = u.id
+            WHERE pu.product_id = $1
+            ORDER BY pu.is_base_unit DESC, pu.conversion_factor ASC
+        `;
+        
+        const result = await database.query(query, [productId]);
+
+        // Trường hợp sản phẩm chưa có bảng quy đổi (Dữ liệu cũ hoặc SP mới tạo sơ sài)
+        if (result.rows.length === 0) {
+            // Lấy thông tin đơn vị gốc từ bảng product để làm đơn vị cơ sở mặc định
+            const productBase = await database.query(
+                'SELECT unit, selling_price FROM product WHERE id = $1', 
+                [productId]
+            );
+
+            if (productBase.rows.length > 0) {
+                return res.status(200).json([{
+                    product_uom_id: null,
+                    uom_id: null,
+                    uom_name: productBase.rows[0].unit || 'Cái',
+                    conversion_factor: 1,
+                    is_base_unit: true,
+                    selling_price: productBase.rows[0].selling_price
+                }]);
+            }
+        }
+
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error("Error in getProductUoms:", error);
+        res.status(500).json({ message: "Lỗi khi lấy danh sách đơn vị quy đổi" });
+    }
+};
+
 export const importStock = async (req, res) => {
     // Lấy userId từ token (đảm bảo authMiddleware đã gán req.user)
     const owner_id = req.user.userId; 

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Printer, Plus, Edit, Trash2, X, RefreshCw, Barcode as BarcodeIcon, Check, PackagePlus, Filter, Scale, CheckCircle2, Database, Edit3 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { productService } from '../../services/product.service';
+import { ownerService } from '../../services/owner.service';
 import { Product } from '../../types';
 import { toast } from 'sonner';
 
@@ -129,7 +130,7 @@ export const InventoryManager = () => {
 
     // Mutation xử lý nhập hàng (Gửi về Backend xử lý Transaction)
     const importMutation = useMutation({
-        mutationFn: (payload: any) => productService.importStock(payload),
+        mutationFn: (payload: any) => ownerService.importStock(payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             toast.success('Nhập kho thành công!');
@@ -150,7 +151,7 @@ export const InventoryManager = () => {
                 id: undefined,
                 name: '',
                 category: '',
-                unit: 'Cái',
+                unit: '',
                 price: 0,
                 stock: 0
             }));
@@ -202,7 +203,7 @@ export const InventoryManager = () => {
         setIsAddingNewUom(false);
         setFormData({
             id: undefined, name: '', category: '', price: 0, 
-            importPrice: 0, quantity: 1, code: '', unit: 'Cái', supplier: '', 
+            importPrice: 0, quantity: 1, code: '', unit: '', supplier: '', 
             uomId: undefined, newUomName: '', conversionFactor: 1
         });
     };
@@ -354,7 +355,7 @@ export const InventoryManager = () => {
                                         <td className="p-4 font-medium text-slate-800">{p.name}</td>
                                         <td className="p-4 text-slate-600">{p.category}</td>
                                         <td className="p-4 text-right font-medium text-slate-700">
-                                            {formatCurrency(p.price)}
+                                            {formatCurrency(p.price)} / {p.unit}
                                         </td>
                                         <td className="p-4 text-center font-bold">{p.stock}</td>
                                         <td className="p-4 text-center">

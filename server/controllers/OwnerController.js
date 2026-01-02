@@ -78,85 +78,89 @@ export const createEmployee = async (req, res) => {
 };
 
 export const importStock = async (req, res) => {
-    const { id, name, category, price, importPrice, quantity, code, unit, supplier } = req.body;
-    const userId = req.user.id;
+    // Lấy userId từ token (đảm bảo authMiddleware đã gán req.user)
+    const owner_id = req.user.userId; 
+    const { 
+        id, isNewProduct, code, name, category, price, 
+        quantity, importPrice, supplier, unit, 
+        newUomName, conversionFactor 
+    } = req.body;
 
     const client = await database.connect();
     try {
-        await client.query('BEGIN');
+        await client.query('BEGIN'); // Bắt đầu Transaction
 
         let productId = id;
-        let isSellingAtLoss = false;
 
-        // 1. Xử lý thông tin Sản phẩm (Product)
-        if (!productId) {
-            // Tạo Sản phẩm mới hoàn toàn
-            const newProd = await client.query(
-                `INSERT INTO product (name, category_name, selling_price, code, unit, is_active) 
-                 VALUES ($1, $2, $3, $4, $5, true) RETURNING id`,
-                [name, category, price, code, unit]
-            );
-            productId = newProd.rows[0].id;
+        // BƯỚC 1: Nếu là sản phẩm mới, tạo sản phẩm trước
+        if (isNewProduct || !productId) {
+            const insertProductSql = `
+                INSERT INTO product (owner_id, code, name, category, price, stock, unit, created_at)
+                VALUES ($1, $2, $3, $4, $5, 0, $6, NOW())
+                RETURNING id;
+            `;
+            const productRes = await client.query(insertProductSql, [owner_id, code, name, category, price, unit]);
+            productId = productRes.rows[0].id;
+        }
+
+        // BƯỚC 2: Xử lý bảng UOM (Đơn vị tính)
+        // Tìm đơn vị trong hệ thống (owner_id IS NULL) hoặc của riêng Owner này
+        const findUomSql = `
+            SELECT id FROM uom 
+            WHERE uom_name = $1 AND (owner_id = $2 OR owner_id IS NULL)
+            LIMIT 1;
+        `;
+        let uomRes = await client.query(findUomSql, [newUomName, owner_id]);
+        let uomId;
+
+        if (uomRes.rows.length === 0) {
+            // Nếu đơn vị chưa tồn tại, thêm mới vào bảng uom
+            const insertUomSql = `INSERT INTO uom (uom_name, owner_id) VALUES ($1, $2) RETURNING id;`;
+            const newUom = await client.query(insertUomSql, [newUomName, owner_id]);
+            uomId = newUom.rows[0].id;
         } else {
-            // Cập nhật giá bán mới cho Sản phẩm cũ
-            await client.query('UPDATE product SET selling_price = $1 WHERE id = $2', [price, productId]);
+            uomId = uomRes.rows[0].id;
         }
 
-        // 2. Lấy dữ liệu tồn kho hiện tại để tính giá vốn bình quân
-        const currentInv = await client.query(
-            'SELECT stock_quantity, average_cost FROM inventory WHERE product_id = $1',
-            [productId]
-        );
+        // BƯỚC 3: Xử lý quy đổi trong bảng PRODUCT_UOM
+        // 3.1. Đảm bảo luôn có đơn vị cơ sở (Base Unit) với hệ số = 1
+        await client.query(`
+            INSERT INTO product_uom (product_id, uom_id, conversion_factor, is_base_unit, selling_price)
+            SELECT $1, id, 1, true, $2 FROM uom 
+            WHERE uom_name = $3 AND (owner_id = $4 OR owner_id IS NULL)
+            ON CONFLICT DO NOTHING;
+        `, [productId, price, unit, owner_id]);
 
-        let newTotalQty = quantity;
-        let newAverageCost = importPrice;
+        // 3.2. Lưu đơn vị quy đổi đang nhập hàng (ví dụ: Thùng)
+        const upsertProductUomSql = `
+            INSERT INTO product_uom (product_id, uom_id, conversion_factor, is_base_unit, selling_price)
+            VALUES ($1, $2, $3, false, $4)
+            ON CONFLICT (product_id, uom_id) DO UPDATE 
+            SET conversion_factor = EXCLUDED.conversion_factor;
+        `;
+        await client.query(upsertProductUomSql, [productId, uomId, conversionFactor, price]);
 
-        if (currentInv.rows.length > 0) {
-            const oldQty = parseFloat(currentInv.rows[0].stock_quantity || 0);
-            const oldAvgCost = parseFloat(currentInv.rows[0].average_cost || 0);
-
-            newTotalQty = oldQty + quantity;
-            // Công thức Bình quân gia quyền
-            newAverageCost = ((oldQty * oldAvgCost) + (quantity * importPrice)) / newTotalQty;
-        }
-
-        // 3. Kiểm tra rủi ro bán lỗ (Cảnh báo nếu giá bán < giá vốn mới)
-        if (price < newAverageCost) {
-            isSellingAtLoss = true;
-        }
-
-        // 4. Cập nhật hoặc Thêm mới vào Inventory
+        // BƯỚC 4: Cập nhật tồn kho thực tế (quy về đơn vị lẻ)
+        const addedStock = Number(quantity) * Number(conversionFactor);
         await client.query(
-            `INSERT INTO inventory (product_id, stock_quantity, average_cost, updated_at) 
-             VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (product_id) 
-             DO UPDATE SET 
-                stock_quantity = EXCLUDED.stock_quantity, 
-                average_cost = EXCLUDED.average_cost,
-                updated_at = NOW()`,
-            [productId, newTotalQty, newAverageCost]
+            'UPDATE product SET stock = stock + $1 WHERE id = $2 AND owner_id = $3',
+            [addedStock, productId, owner_id]
         );
 
-        // 5. Lưu lịch sử nhập hàng (Để làm báo cáo Thông tư 88)
-        await client.query(
-            `INSERT INTO stock_import (user_id, product_id, quantity, import_price, supplier_info) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [userId, productId, quantity, importPrice, supplier]
-        );
+        // BƯỚC 5: Ghi lịch sử nhập kho và sổ sách (Bookkeeping)
+        const total_cost = Number(quantity) * Number(importPrice);
+        await client.query(`
+            INSERT INTO stock_import (product_id, owner_id, quantity, import_price, total_cost, supplier, uom_name, imported_by_user_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW());
+        `, [productId, owner_id, quantity, importPrice, total_cost, supplier, newUomName, owner_id]);
 
-        await client.query('COMMIT');
-        
-        res.status(200).json({ 
-            message: "Nhập hàng thành công!", 
-            productId,
-            warning: isSellingAtLoss ? "Cảnh báo: Giá bán lẻ đang thấp hơn giá vốn bình quân!" : null,
-            newAverageCost: newAverageCost.toFixed(2)
-        });
+        await client.query('COMMIT'); // Hoàn tất
+        res.status(200).json({ success: true, message: 'Nhập kho và lưu đơn vị thành công!' });
 
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error(error);
-        res.status(500).json({ message: "Lỗi hệ thống: " + error.message });
+        await client.query('ROLLBACK'); // Hủy bỏ nếu lỗi
+        console.error("Lỗi xử lý nhập kho:", error);
+        res.status(500).json({ success: false, message: 'Lỗi server khi lưu dữ liệu' });
     } finally {
         client.release();
     }

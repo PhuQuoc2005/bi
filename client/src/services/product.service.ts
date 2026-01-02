@@ -54,11 +54,6 @@ export const productService = {
     return api.delete(`/products/${id}`);
   },
 
-  // Nhập kho sản phẩm
-  importStock: async (data: { product_id: string; quantity: number; importPrice: number; supplier?: string; }) => {
-    return api.post('/owners/import', data);
-  },
-
   // Lấy tất cả đơn vị tính (UoM)
   getAllUoms: async () => {
       const response = await api.get('/products/uoms/all');

@@ -5,7 +5,7 @@ export const generateToken = (userId, res) => {
     const secret = process.env.JWT_SECRET_KEY; 
 
     if (!secret) {
-        console.log("❌ Lỗi: Không tìm thấy JWT_SECRET_KEY trong môi trường!");
+        console.log("Lỗi: Không tìm thấy JWT_SECRET_KEY trong môi trường!");
         throw new Error('JWT_SECRET is not configured');
     }
 

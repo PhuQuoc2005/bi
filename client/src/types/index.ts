@@ -13,14 +13,23 @@ export interface User {
 export interface Product {
   id: string;
   owner_id: string;
+  code?: string;      // Mã sản phẩm hoặc Barcode
   name: string;
   category?: string;
+  quantity: number; // Số lượng dùng khi nhập kho
+  importPrice: number; // Giá nhập dùng khi nhập kho
+  uomId?: number;     // Đơn vị tính
+  supplier?: string; // Nhà cung cấp dùng khi nhập kho
   price: number;       // DECIMAL(19,2)
+  selling_price?: number; // Giá bán lẻ
   stock: number;       // stock trong DB
   unit?: string;       // Lưu ý: Trong file Product.js bạn gửi KHÔNG CÓ cột 'unit'. Bạn nên thêm cột này vào DB nếu cần, hoặc tạm dùng 'Cái'.
   images: string[];    // JSONB trong DB -> Mảng string ở Frontend
+  conversionFactor?: number; // Hệ số quy đổi
+  newUomName?: string; // Tên đơn vị tính mới khi tạo
   is_active: boolean;
   created_at: string;
+
 }
 
 // Interface cho payload tạo đơn hàng

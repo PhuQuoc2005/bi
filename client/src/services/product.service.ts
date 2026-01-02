@@ -39,8 +39,34 @@ export const productService = {
     });
   },
 
-  // Giữ nguyên các hàm khác (delete, create...)
-  delete: async (id: string) => {
+  // Create product
+  create: async (data: Partial<Product>) => {
+    return api.post('/products', data);
+  },
+
+  // Update product
+  update: async (id: string | number, data: Partial<Product>) => {
+    return api.put(`/products/${id}`, data);
+  },
+
+  // Delete product
+  delete: async (id: string | number) => {
     return api.delete(`/products/${id}`);
-  }
+  },
+
+  // Nhập kho sản phẩm
+  importStock: async (data: { product_id: string; quantity: number; importPrice: number; supplier?: string; }) => {
+    return api.post('/owners/import', data);
+  },
+
+  // Lấy tất cả đơn vị tính (UoM)
+  getAllUoms: async () => {
+      const response = await api.get('/products/uoms/all');
+      return response.data;
+  },
+  // Lấy đơn vị tính của sản phẩm
+  getProductUoms: async (productId: String) => {
+    const response = await api.get(`/products/${productId}/uoms`);
+    return response.data;
+  },
 };

@@ -76,3 +76,88 @@ export const createEmployee = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi hệ thống, vui lòng thử lại sau' });
     }
 };
+
+export const importStock = async (req, res) => {
+    const { id, name, category, price, importPrice, quantity, code, unit, supplier } = req.body;
+    const userId = req.user.id;
+
+    const client = await database.connect();
+    try {
+        await client.query('BEGIN');
+
+        let productId = id;
+        let isSellingAtLoss = false;
+
+        // 1. Xử lý thông tin Sản phẩm (Product)
+        if (!productId) {
+            // Tạo Sản phẩm mới hoàn toàn
+            const newProd = await client.query(
+                `INSERT INTO product (name, category_name, selling_price, code, unit, is_active) 
+                 VALUES ($1, $2, $3, $4, $5, true) RETURNING id`,
+                [name, category, price, code, unit]
+            );
+            productId = newProd.rows[0].id;
+        } else {
+            // Cập nhật giá bán mới cho Sản phẩm cũ
+            await client.query('UPDATE product SET selling_price = $1 WHERE id = $2', [price, productId]);
+        }
+
+        // 2. Lấy dữ liệu tồn kho hiện tại để tính giá vốn bình quân
+        const currentInv = await client.query(
+            'SELECT stock_quantity, average_cost FROM inventory WHERE product_id = $1',
+            [productId]
+        );
+
+        let newTotalQty = quantity;
+        let newAverageCost = importPrice;
+
+        if (currentInv.rows.length > 0) {
+            const oldQty = parseFloat(currentInv.rows[0].stock_quantity || 0);
+            const oldAvgCost = parseFloat(currentInv.rows[0].average_cost || 0);
+
+            newTotalQty = oldQty + quantity;
+            // Công thức Bình quân gia quyền
+            newAverageCost = ((oldQty * oldAvgCost) + (quantity * importPrice)) / newTotalQty;
+        }
+
+        // 3. Kiểm tra rủi ro bán lỗ (Cảnh báo nếu giá bán < giá vốn mới)
+        if (price < newAverageCost) {
+            isSellingAtLoss = true;
+        }
+
+        // 4. Cập nhật hoặc Thêm mới vào Inventory
+        await client.query(
+            `INSERT INTO inventory (product_id, stock_quantity, average_cost, updated_at) 
+             VALUES ($1, $2, $3, NOW())
+             ON CONFLICT (product_id) 
+             DO UPDATE SET 
+                stock_quantity = EXCLUDED.stock_quantity, 
+                average_cost = EXCLUDED.average_cost,
+                updated_at = NOW()`,
+            [productId, newTotalQty, newAverageCost]
+        );
+
+        // 5. Lưu lịch sử nhập hàng (Để làm báo cáo Thông tư 88)
+        await client.query(
+            `INSERT INTO stock_import (user_id, product_id, quantity, import_price, supplier_info) 
+             VALUES ($1, $2, $3, $4, $5)`,
+            [userId, productId, quantity, importPrice, supplier]
+        );
+
+        await client.query('COMMIT');
+        
+        res.status(200).json({ 
+            message: "Nhập hàng thành công!", 
+            productId,
+            warning: isSellingAtLoss ? "Cảnh báo: Giá bán lẻ đang thấp hơn giá vốn bình quân!" : null,
+            newAverageCost: newAverageCost.toFixed(2)
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error(error);
+        res.status(500).json({ message: "Lỗi hệ thống: " + error.message });
+    } finally {
+        client.release();
+    }
+};

@@ -9,4 +9,7 @@ const router = express.Router();
 // Chỉ Owner mới có thể tạo nhân viên
 router.post('/employees', verifyToken, isOwner, OwnerController.createEmployee);
 
+// Chỉ Owner mới có thể nhập kho sản phẩm
+router.post('/import', verifyToken, OwnerController.importStock);
+
 export default router;

@@ -12,6 +12,8 @@ import { createAuditLogTable } from '../models/AuditLog.js';
 import { createSubscriptionPlanTable } from '../models/SubscriptionPlan.js';
 import { createSystemConfigTable } from '../models/SystemConfig.js';
 import { createUserApprovalTable } from '../models/UserApproval.js';
+import { createUomTable } from '../models/Uom.js';
+import { createProductUomTable } from '../models/ProductUom.js';
 
 export const createTables = async () => {
     try {
@@ -29,6 +31,8 @@ export const createTables = async () => {
         await createSubscriptionPlanTable();
         await createSystemConfigTable();
         await createUserApprovalTable();
+        await createUomTable();
+        await createProductUomTable();
         console.log('All tables created successfully.');
     } catch (error) {
         console.error('Error creating tables:', error); 

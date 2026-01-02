@@ -8,6 +8,7 @@ export const createProductTable = async () => {
             CREATE TABLE IF NOT EXISTS product (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 owner_id UUID NOT NULL,
+                code VARCHAR(50), -- Mã sản phẩm hoặc Barcode
                 name VARCHAR(255) NOT NULL,
                 category VARCHAR(100),
                 price DECIMAL(19, 2) NOT NULL CHECK (price >= 0),

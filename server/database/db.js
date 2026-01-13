@@ -18,32 +18,54 @@ console.log("DB_PASS:", process.env.PGPASSWORD ? "Đã có" : "Trống");
 console.log("NODE_ENV:", process.env.NODE_ENV || "Trống");
 console.log("-------------------------------");
 
-const database = new Pool({
-    host: process.env.PGHOST,
-    database: process.env.PGDATABASE,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    port: process.env.PGPORT || 5432,
-    // Tắt hoàn toàn SSL khi ở môi trường phát triển
-     ssl: process.env.NODE_ENV === 'production' 
-         ? { rejectUnauthorized: false, require: true } 
-         : { require: true},
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-});
+class Database {
+    static instance;
 
-database.on('error', (err) => {
-    console.error('PostgreSQL Pool Error:', err.message);
-});
+    constructor() {
+        if (Database.instance) {
+            return Database.instance;
+        }
 
-try {
-    const client = await database.connect();
-    console.log('Database connected successfully');
-    client.release();
-} catch (error) {
-    console.error('Database connection error:', error.message);
-    process.exit(1);
+        // Tạo ID ngẫu nhiên để demo
+        this.id = Math.random().toString(36).substring(2, 9);
+        console.log('Creating new Database instance, id =', this.id);
+
+        console.log('Initializing PostgreSQL Pool...');
+
+        this.pool = new Pool({
+            id: this.id,
+            host: process.env.PGHOST,
+            database: process.env.PGDATABASE,
+            user: process.env.PGUSER,
+            password: process.env.PGPASSWORD,
+            port: process.env.PGPORT || 5432,
+            ssl: process.env.NODE_ENV === 'production'
+                ? { rejectUnauthorized: false }
+                : { require: true },
+            max: 10,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 20000,
+        });
+
+        this.pool.on('error', (err) => {
+            console.error('PostgreSQL Pool Error:', err.message);
+        });
+
+        Database.instance = this;
+    }
+
+    async connect() {
+        const client = await this.pool.connect();
+        console.log('Database connected successfully');
+        client.release();
+    }
+
+    getPool() {
+        return this.pool;
+    }
 }
 
-export default database;
+const database = new Database();
+await database.connect();
+
+export default database.getPool();

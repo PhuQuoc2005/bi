@@ -3,15 +3,15 @@
 export type Role = 'ADMIN' | 'OWNER' | 'EMPLOYEE';
 
 export interface User {
-  id: string;
+  readonly id: string;
   name: string;
-  email: string;
+  phone: string;
   role: Role;
   owner_id?: string; // Nếu là employee thì cần biết thuộc owner nào
 }
 
 export interface Product {
-  id: string;
+  readonly id: string;
   owner_id: string;
   code?: string;      // Mã sản phẩm hoặc Barcode
   name: string;

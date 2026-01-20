@@ -24,15 +24,23 @@ export const ownerService = {
         return api.put(`/owner/employees/${id}/password`, data);
     },
 
+    // Xóa nhân viên
+    deleteEmployee: async (id: string) => {
+        return api.delete(`/owner/employees/${id}`);
+    },
+
     // Lấy nhật ký hoạt động
     getAuditLogs: async (search: string = '') => {
         const response = await api.get(`/owner/audit-logs?search=${search}`);
         return response.data;
     },
 
-    // Xóa nhân viên
-    deleteEmployee: async (id: string) => {
-        return api.delete(`/owner/employees/${id}`);
+    deleteAuditLog: async (id: string) => {
+        return api.delete(`/owner/audit-logs/${id}`);
+    },
+
+    clearAuditLogs: async () => {
+        return api.delete('/owner/audit-logs/clear');
     },
 
     // Lấy tất cả đơn vị tính (UoM)

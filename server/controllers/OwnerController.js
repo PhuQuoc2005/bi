@@ -1,6 +1,7 @@
 import { generateToken } from "../utils/JwtToken.js";
 import { checkPlanLimit } from '../utils/planLimiter.js';
 import database from '../database/db.js';
+import { saveLog } from '../models/AuditLog.js';
 import bcrypt from 'bcryptjs';
 
 // Tạo nhân viên
@@ -63,6 +64,13 @@ export const createEmployee = async (req, res) => {
         );
 
         if (newUser.rows.length > 0) {
+            await saveLog(database, {
+                user_id: owner_id,
+                action: 'CREATE_EMPLOYEE',
+                entity_type: 'users',
+                entity_id: newUser.rows[0].id,
+                new_value: { full_name: newUser.rows[0].full_name, phone: newUser.rows[0].phone_number }
+            });
             return res.status(201).json({
                 success: true,
                 message: 'Tạo tài khoản nhân viên thành công!',
@@ -130,6 +138,15 @@ export const toggleStaffStatus = async (req, res) => {
             [newStatus, id]
         );
 
+        await saveLog(database, {
+            user_id: owner_id,
+            action: newStatus === 'ACTIVE' ? 'UNLOCK_ACCOUNT' : 'LOCK_ACCOUNT',
+            entity_type: 'users',
+            entity_id: id,
+            old_value: { status: currentStatus },
+            new_value: { status: newStatus }
+        });
+
         res.status(200).json({ success: true, message: `Đã cập nhật trạng thái thành ${newStatus}` });
     } catch (error) {
         console.error('Error in toggleStaffStatus:', error);
@@ -171,15 +188,28 @@ export const deleteEmployee = async (req, res) => {
     const owner_id = req.user.userId;
 
     try {
-        // Kiểm tra nhân viên có thuộc quyền quản lý của Owner không
+
+        const staffRes = await database.query(
+            'SELECT full_name, phone_number FROM users WHERE id = $1 AND owner_id = $2',
+            [id, owner_id]
+        );
+        if (staffRes.rows.length === 0) {
+            return res.status(404).json({ message: 'Không tìm thấy nhân viên' });
+        }
+        const oldData = staffRes.rows[0];
+
         const result = await database.query(
             'DELETE FROM users WHERE id = $1 AND owner_id = $2 AND role_id = 3',
             [id, owner_id]
         );
 
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: 'Không tìm thấy nhân viên hoặc bạn không có quyền xóa' });
-        }
+        await saveLog(database, {
+            user_id: owner_id,
+            action: 'DELETE_EMPLOYEE',
+            entity_type: 'users',
+            entity_id: id,
+            old_value: oldData
+        });
 
         res.status(200).json({ success: true, message: 'Đã xóa nhân viên thành công' });
     } catch (error) {
@@ -378,6 +408,14 @@ export const importStock = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW());
         `, [productId, owner_id, quantity, importPrice, total_cost, supplier, newUomName, owner_id]);
 
+        await saveLog(client, {
+            user_id: owner_id,
+            action: 'IMPORT_STOCK',
+            entity_type: 'inventory',
+            entity_id: productId,
+            new_value: { qty: quantity, price: importPrice, total: total_cost }
+        });
+
         await client.query('COMMIT');
         res.status(200).json({ success: true, message: 'Nhập hàng và cập nhật đơn vị thành công!' });
 
@@ -387,5 +425,98 @@ export const importStock = async (req, res) => {
         res.status(500).json({ success: false, message: 'Lỗi server' });
     } finally {
         client.release();
+    }
+};
+
+// audit log
+
+// Lấy log
+export const getAuditLogs = async (req, res) => {
+    const owner_id = req.user.userId; // ID của Owner từ middleware verifyToken
+    const { search } = req.query;
+
+    try {
+        let query = `
+            SELECT 
+                al.id, 
+                al.action, 
+                al.entity_type, 
+                al.entity_id,
+                al.old_value, 
+                al.new_value, 
+                al.timestamp AS created_at,
+                u.full_name AS user_name,
+                r.role_name
+            FROM audit_log al
+            JOIN users u ON al.user_id = u.id
+            LEFT JOIN role r ON u.role_id = r.id
+            WHERE (u.id = $1 OR u.owner_id = $1)
+        `;
+        const params = [owner_id];
+
+        if (search) {
+            query += ` AND (u.full_name ILIKE $2 OR al.action ILIKE $2 OR al.entity_type ILIKE $2)`;
+            params.push(`%${search}%`);
+        }
+
+        query += ` ORDER BY al.timestamp DESC LIMIT 200`; 
+
+        const result = await database.query(query, params);
+        
+        const data = result.rows.map(log => ({
+            ...log,
+            description: `${log.action} trên ${log.entity_type} (ID: ${log.entity_id || 'N/A'})`
+        }));
+
+        res.status(200).json(data);
+    } catch (error) {
+        console.error('Error in getAuditLogs:', error);
+        res.status(500).json({ message: 'Lỗi hệ thống khi lấy nhật ký hoạt động' });
+    }
+};
+
+// xóa log theo id
+export const deleteAuditLog = async (req, res) => {
+    const { id } = req.params;
+    const owner_id = req.user.userId;
+
+    try {
+        const query = `
+            DELETE FROM audit_log 
+            WHERE id = $1 AND user_id IN (
+                SELECT id FROM users WHERE id = $2 OR owner_id = $2
+            )
+            RETURNING id
+        `;
+        const result = await database.query(query, [id, owner_id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy bản ghi hoặc bạn không có quyền xóa' });
+        }
+
+        res.status(200).json({ success: true, message: 'Đã xóa bản ghi nhật ký thành công' });
+    } catch (error) {
+        console.error('Error in deleteAuditLog:', error);
+        res.status(500).json({ message: 'Lỗi hệ thống khi xóa nhật ký' });
+    }
+};
+
+// Xóa toàn bộ nhật ký của cửa hàng
+export const clearAuditLogs = async (req, res) => {
+    const owner_id = req.user.userId;
+    try {
+        // Chỉ xóa những log thuộc về owner này hoặc nhân viên của owner này
+        const query = `
+            DELETE FROM audit_log 
+            WHERE user_id IN (
+                SELECT id FROM users WHERE id = $1 OR owner_id = $1
+            )
+        `;
+        await database.query(query, [owner_id]);
+
+        res.status(200).json({ success: true, message: 'Đã xóa toàn bộ nhật ký hoạt động' });
+    } catch (error) {
+        console.error('Error in clearAuditLogs:', error);
+        res.status(500).json({ message: 'Lỗi khi xóa nhật ký' });
     }
 };

@@ -22,4 +22,9 @@ router.get('/:productId/uoms', verifyToken, OwnerController.getProductUoms);
 // Chỉ Owner mới có thể nhập kho sản phẩm
 router.post('/import', verifyToken, isOwner, OwnerController.importStock);
 
+// audit log
+router.get('/audit-logs', verifyToken, isOwner, OwnerController.getAuditLogs);
+router.delete('/audit-logs/clear', verifyToken, isOwner, OwnerController.clearAuditLogs);
+router.delete('/audit-logs/:id', verifyToken, isOwner, OwnerController.deleteAuditLog);
+
 export default router;

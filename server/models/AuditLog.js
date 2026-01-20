@@ -24,3 +24,18 @@ export const createAuditLogTable = async () => {
         process.exit(1);
     }
 }
+
+export const saveLog = async (client, { user_id, action, entity_type, entity_id, old_value = null, new_value = null }) => {
+    const query = `
+        INSERT INTO audit_log (user_id, action, entity_type, entity_id, old_value, new_value)
+        VALUES ($1, $2, $3, $4, $5, $6)
+    `;
+    await client.query(query, [
+        user_id, 
+        action, 
+        entity_type, 
+        entity_id, 
+        old_value ? JSON.stringify(old_value) : null, 
+        new_value ? JSON.stringify(new_value) : null
+    ]);
+};

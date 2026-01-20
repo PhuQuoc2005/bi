@@ -28,7 +28,7 @@ export default function Header() {
     <header className="h-16 bg-white border-b flex items-center justify-between px-6">
       <h2 className="text-lg font-semibold text-gray-800">Dashboard</h2>
       <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-600">Xin chào, Owner</span>
+        <span className="text-sm text-gray-600">Xin chào, {JSON.parse(localStorage.getItem('user') || '{}')?.full_name}</span>
         <Button variant="ghost" size="icon" onClick={handleLogout} title="Đăng xuất" >
           <LogOut size={20} />
         </Button>

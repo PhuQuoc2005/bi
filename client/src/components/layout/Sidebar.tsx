@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 // Thêm icon Store hoặc Calculator
-import { LayoutDashboard, Package, Users, FileBarChart, ShoppingCart, Store } from 'lucide-react'; 
+import { LayoutDashboard, Package, Users, FileBarChart, 
+  ShoppingCart, Store, UserCog
+} from 'lucide-react'; 
 import { cn } from '@/lib/utils';
 
 const sidebarItems = [
@@ -12,11 +15,17 @@ const sidebarItems = [
   { href: '/dashboard/inventory', label: 'Kho hàng', icon: Package },
   { href: '/dashboard/orders', label: 'Đơn hàng', icon: ShoppingCart },
   { href: '/dashboard/customers', label: 'Khách hàng', icon: Users },
+  { href: '/dashboard/staff', label: 'Nhân viên', icon: UserCog },
   { href: '/dashboard/reports', label: 'Báo cáo', icon: FileBarChart },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <aside className="w-64 bg-white border-r h-screen flex flex-col hidden md:flex">
@@ -36,7 +45,7 @@ export default function Sidebar() {
 
         {sidebarItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = mounted && pathname === item.href;
           return (
             <Link
               key={item.href}

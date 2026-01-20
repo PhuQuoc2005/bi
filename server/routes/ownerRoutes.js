@@ -4,10 +4,12 @@ import { verifyToken, isOwner } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Routes Quản lý employee - Chỉ Owner mới được phép truy cập
-
-// Chỉ Owner mới có thể tạo nhân viên
+// Route Nhân viên
+router.get('/employees', verifyToken, isOwner, OwnerController.getEmployees);
 router.post('/employees', verifyToken, isOwner, OwnerController.createEmployee);
+router.put('/employees/:id/toggle-status', verifyToken, isOwner, OwnerController.toggleStaffStatus);
+router.put('/employees/:id/password', verifyToken, isOwner, OwnerController.changeStaffPassword);
+router.delete('/employees/:id', verifyToken, isOwner, OwnerController.deleteEmployee);
 
 // Lấy tất cả đơn vị tính (UoM) - dùng cho dropdown khi tạo/sửa sản phẩm
 router.get('/uoms/all', verifyToken, isOwner, OwnerController.getAllUoms);

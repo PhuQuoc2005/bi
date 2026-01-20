@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import './globals.css';
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { Toaster } from "@/components/ui/sonner";
 import QueryProvider from '@/components/providers/QueryProvider'; // Import component vừa tạo
 
 export const metadata = {
@@ -14,12 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <body>
         {/* Bọc ứng dụng bằng QueryProvider */}
         <QueryProvider>
           {children}
-          {/* <Toaster /> */}
+          <Toaster />
         </QueryProvider>
       </body>
     </html>

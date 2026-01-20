@@ -24,7 +24,7 @@ export default function ProductGrid() {
     const searchLower = searchTerm.toLowerCase();
     return (
       p.name.toLowerCase().includes(searchLower) || 
-      (p.barcode && p.barcode.includes(searchLower))
+      (p.code && p.code.includes(searchLower))
     );
   });
 
@@ -81,7 +81,7 @@ export default function ProductGrid() {
                 <p className="text-blue-600 font-bold">{formatCurrency(product.price)}</p>
                 <div className="flex justify-between items-center text-xs text-slate-400 mt-1">
                    <span>ĐVT: {product.unit}</span>
-                   <span>Tồn: {product.stockQuantity}</span>
+                   <span>Tồn: {product.stock}</span>
                 </div>
             </div>
           </div>

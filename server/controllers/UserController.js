@@ -71,7 +71,6 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
     const { phone_number, password } = req.body;
-    console.log("Database Instance ID in UserController.js:", database.options.id); // demo
     try {
         // Validate input
         if (!phone_number || !password){

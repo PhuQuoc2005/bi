@@ -7,6 +7,7 @@ import fileUpload from 'express-fileupload';
 import { createTables } from './utils/createTable.js';
 import routes from './routes/routes.js';
 import productRoutes from './routes/productRoutes.js';
+import initJobs from './utils/scheduler.js';
 
 const app = express();
 
@@ -33,5 +34,6 @@ app.use(fileUpload({
 routes(app);
 
 createTables();
+initJobs();
 
 export default app;

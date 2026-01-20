@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 // Thêm icon Store hoặc Calculator
 import { LayoutDashboard, Package, Users, FileBarChart, 
-  ShoppingCart, Store, UserCog
+  ShoppingCart, Store, UserCog, History
 } from 'lucide-react'; 
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ const sidebarItems = [
   { href: '/dashboard/orders', label: 'Đơn hàng', icon: ShoppingCart },
   { href: '/dashboard/customers', label: 'Khách hàng', icon: Users },
   { href: '/dashboard/staff', label: 'Nhân viên', icon: UserCog },
+  { href: '/dashboard/audit-logs', label: 'Nhật ký', icon: History },
   { href: '/dashboard/reports', label: 'Báo cáo', icon: FileBarChart },
 ];
 

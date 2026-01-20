@@ -1,5 +1,6 @@
 // BizFlow/server/controllers/ProductController.js
 import database from '../database/db.js';
+import { saveLog } from '../models/AuditLog.js';
 import AIService from '../services/AIService.js';
 import { checkPlanLimit } from '../utils/planLimiter.js';
 
@@ -99,6 +100,8 @@ export const updateProduct = async (req, res) => {
         const { id } = req.params; // Lấy ID sản phẩm
         const { name, price, stock, unit, category_id, description, code, images } = req.body;
         const owner_id = req.user.userId;
+        const oldProductRes = await database.query('SELECT price, name FROM product WHERE id = $1', [id]);
+        const oldData = oldProductRes.rows[0];
 
         // 1. Validate cơ bản
         if (!id) return res.status(400).json({ success: false, message: "Thiếu ID sản phẩm" });
@@ -145,6 +148,15 @@ export const updateProduct = async (req, res) => {
             }
         }
 
+        await saveLog(database, {
+          user_id: owner_id,
+          action: 'UPDATE_PRODUCT',
+          entity_type: 'product',
+          entity_id: id,
+          old_value: oldData,
+          new_value: { name, price }
+        });
+
         // 5. Commit Transaction
         await db.query('COMMIT');
 
@@ -169,11 +181,23 @@ export const deleteProduct = async (req, res) => {
   const owner_id = req.user.userId; // SỬA: id -> userId
 
   try {
-    const result = await database.query('DELETE FROM product WHERE id = $1 AND owner_id = $2 RETURNING id', [id, owner_id]);
-
-    if (result.rows.length === 0) {
+    const productRes = await database.query(
+        'SELECT name, price, code FROM product WHERE id = $1 AND owner_id = $2',
+        [id, owner_id]
+    );
+    if (productRes.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm' });
     }
+    const oldData = productRes.rows[0];
+    await database.query('DELETE FROM product WHERE id = $1 AND owner_id = $2 RETURNING id', [id, owner_id]);
+
+    await saveLog(database, {
+        user_id: owner_id,
+        action: 'DELETE_PRODUCT',
+        entity_type: 'product',
+        entity_id: id,
+        old_value: oldData
+    });
 
     res.status(200).json({
       success: true,

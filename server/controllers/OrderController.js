@@ -1,4 +1,5 @@
 import db from '../database/db.js';
+import { saveLog } from '../models/AuditLog.js';
 
 export const createOrder = async (req, res) => {
     // 1. Lấy dữ liệu
@@ -142,6 +143,14 @@ export const createOrder = async (req, res) => {
                 );
             }
         }
+
+        await saveLog(client, {
+            user_id: userId,
+            action: is_debt ? 'CREATE_DEBT_ORDER' : 'CREATE_ORDER',
+            entity_type: 'sales_order',
+            entity_id: orderId,
+            new_value: { total: finalTotalPrice, customer: customer_name, is_debt }
+        });
 
         await client.query('COMMIT'); 
         

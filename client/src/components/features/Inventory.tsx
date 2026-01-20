@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Printer, Plus, Edit, Trash2, X, RefreshCw, Barcode as BarcodeIcon, Check, PackagePlus, Filter, Scale, CheckCircle2, Database, Edit3 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -34,7 +34,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 };
 
 // Bộ từ điển gợi ý đơn vị cơ sở và hệ số quy đổi
-const UOM_GROUP_MAPPING = {
+const UOM_GROUP_MAPPING : Record<string, { base: string; factor: number }> = {
     // Nhóm Trọng lượng
     'Tấn': { base: 'Kg', factor: 1000 },
     'Tạ': { base: 'Kg', factor: 100 },
@@ -75,7 +75,7 @@ export const InventoryManager = () => {
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-    const [isNewProduct, setIsNewProduct] = useState(false);
+    const [isNewProduct, setIsNewProduct] = useState(true);
     const [isAddingNewUom, setIsAddingNewUom] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<Partial<Product>>({
@@ -96,12 +96,15 @@ export const InventoryManager = () => {
     });
 
     const [isManualCategory, setIsManualCategory] = useState(false);
+    const [activeUomMapping, setActiveUomMapping] = useState(UOM_GROUP_MAPPING);
 
     // Tự động quản lý trạng thái loading với useQuery
-    const { data: products = [], isLoading } = useQuery({
+    const { data: productsData, isLoading } = useQuery({
         queryKey: ['products'],
         queryFn: productService.getAll,
     });
+
+    const products = React.useMemo(() => productsData || [], [productsData]);
 
     const { data: globalUoms = [] } = useQuery({
         queryKey: ['all-uoms'],
@@ -112,7 +115,8 @@ export const InventoryManager = () => {
     const { data: storeUoms = [] } = useQuery({
         queryKey: ['store-uoms'],
         queryFn: async () => {
-            return ownerService.getStoreUoms(); // Bạn cần thêm hàm này vào owner.service.ts
+            const response = await ownerService.getStoreUoms();
+            return response.data || response;
         },
     });
 
@@ -169,7 +173,7 @@ export const InventoryManager = () => {
         // 2. Nếu ô nhập trống, reset về trạng thái sản phẩm mới
         if (!searchCode) {
             // FIX: Chỉ reset nếu đang KHÔNG phải là trạng thái trống (đang có ID hoặc tên)
-            if (!isNewProduct || formData.id !== undefined || formData.name !== '') {
+            if (!isNewProduct || formData.id !== undefined) {
                 setIsNewProduct(true);
                 setFormData(prev => ({
                     ...prev,
@@ -188,8 +192,6 @@ export const InventoryManager = () => {
             const foundProduct = products.find((p: any) => p.code === searchCode);
 
             if (foundProduct) {
-                // FIX: Chỉ cập nhật nếu ID hiện tại KHÁC với ID sản phẩm tìm thấy
-                // Điều này ngăn chặn việc setFormData lặp lại nếu dữ liệu đã đúng
                 if (formData.id !== foundProduct.id) {
                     setIsNewProduct(false);
                     setFormData(prev => ({
@@ -204,9 +206,6 @@ export const InventoryManager = () => {
                     toast.success(`Đã nhận diện: ${foundProduct.name}`);
                 }
             } else {
-                // Nếu không tìm thấy
-                // FIX: Chỉ reset form nếu form đang chứa dữ liệu của một sản phẩm cũ (có ID)
-                // Nếu đang nhập tay sản phẩm mới (id undefined) thì KHÔNG reset để tránh mất tên/giá vừa nhập
                 if (formData.id !== undefined) {
                     setIsNewProduct(true);
                     setFormData(prev => ({
@@ -220,8 +219,40 @@ export const InventoryManager = () => {
                 }
             }
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.code, products]);
+    }, [formData.code, products, formData.id, isNewProduct]);
+
+
+    useEffect(() => {
+        // 1. Kiểm tra nếu chưa có dữ liệu thì không làm gì cả
+        if (!globalUoms && !storeUoms) return;
+
+        const newMapping = { ...UOM_GROUP_MAPPING };
+
+        // 2. Sử dụng Optional Chaining và đảm bảo luôn là Array
+        const safeGlobalUoms = Array.isArray(globalUoms) ? globalUoms : [];
+        const safeStoreUoms = Array.isArray(storeUoms) ? storeUoms : [];
+
+        safeGlobalUoms.forEach((uom: any) => {
+            if (uom?.uom_name && uom?.base_unit) {
+                newMapping[uom.uom_name] = {
+                    base: uom.base_unit,
+                    factor: Number(uom.conversion_factor) || 1
+                };
+            }
+        });
+
+        safeStoreUoms.forEach((uom: any) => {
+            if (uom?.uom_name) {
+                newMapping[uom.uom_name] = {
+                    base: uom.base_unit,
+                    factor: Number(uom.conversion_factor) || 1
+                };
+            }
+        });
+
+        setActiveUomMapping(newMapping);
+        console.log("activeUomMapping", activeUomMapping)
+    }, [globalUoms, storeUoms]);
 
     const deleteMutation = useMutation({
         mutationFn: productService.delete,
@@ -307,8 +338,13 @@ export const InventoryManager = () => {
         : 0;
 
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.unit) {
+            toast.error("Đơn vị tính không được để trống");
+            return;
+        }
         
         // Kiểm tra các trường bắt buộc
         if (!formData.code || !formData.name || !formData.price) {
@@ -317,10 +353,7 @@ export const InventoryManager = () => {
         }
 
         // Gửi flag isNewProduct để Backend biết đường xử lý
-        importMutation.mutate({
-            ...formData,
-            isNewProduct: isNewProduct
-        });
+        const respose = await ownerService.importStock(formData)
     };
 
     // --- PHẦN GIAO DIỆN (UI) ---
@@ -637,12 +670,12 @@ export const InventoryManager = () => {
                                                             if (!val) return;
 
                                                             // Tìm tên đơn vị dựa trên ID đã chọn (từ globalUoms hoặc productUoms)
-                                                            const selectedUom = globalUoms.find(u => u.id === Number(val)) || 
-                                                                                productUoms.find(u => u.uom_id === Number(val));
+                                                            const selectedUom = globalUoms.find((u: any) => u.id === Number(val)) || 
+                                                                                productUoms.find((u: any) => u.uom_id === Number(val));
                                                             
                                                             const uomName = selectedUom?.uom_name || "";
                                                             
-                                                            const mapping = UOM_GROUP_MAPPING[uomName];
+                                                            const mapping = UOM_GROUP_MAPPING[uomName as keyof typeof UOM_GROUP_MAPPING];
 
                                                             setFormData({
                                                                 ...formData,
@@ -682,7 +715,7 @@ export const InventoryManager = () => {
                                                                 value={formData.unit}
                                                                 onChange={e => setFormData({...formData, unit: e.target.value})}
                                                             >
-                                                                <option value="formData.unit">{formData.unit}</option>
+                                                                <option value={formData.unit}>{formData.unit}</option>
                                                             </select>
                                                         </div>
                                                 </div>

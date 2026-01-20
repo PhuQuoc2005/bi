@@ -2,6 +2,39 @@ import api from '@/lib/axios';
 import { Product } from '@/types';
 
 export const ownerService = {
+    
+    // Lấy danh sách nhân viên
+    getEmployees: async (search: string = '') => {
+        const response = await api.get(`/owner/employees?search=${search}`);
+        return response.data;
+    },
+
+    // Tạo nhân viên mới
+    createEmployee: async (data: any) => {
+        return api.post('/owner/employees', data);
+    },
+
+    // Khóa/Mở khóa tài khoản nhân viên
+    toggleStaffStatus: async (id: string) => {
+        return api.put(`/owner/employees/${id}/toggle-status`);
+    },
+
+    // Đổi mật khẩu nhân viên
+    changeStaffPassword: async (id: string, data: any) => {
+        return api.put(`/owner/employees/${id}/password`, data);
+    },
+
+    // Lấy nhật ký hoạt động
+    getAuditLogs: async (search: string = '') => {
+        const response = await api.get(`/owner/audit-logs?search=${search}`);
+        return response.data;
+    },
+
+    // Xóa nhân viên
+    deleteEmployee: async (id: string) => {
+        return api.delete(`/owner/employees/${id}`);
+    },
+
     // Lấy tất cả đơn vị tính (UoM)
     getAllUoms: async () => {
         const response = await api.get('/owner/uoms/all');
@@ -19,8 +52,7 @@ export const ownerService = {
         return response.data;
     },
 
-    // Nhập kho sản phẩm
-    importStock: async (data: { product_id: string; quantity: number; importPrice: number; supplier?: string; }) => {
+    importStock: async (data: Object) => {
         return api.post('/owner/import', data);
     },
 };

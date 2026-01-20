@@ -26,10 +26,6 @@ class Database {
             return Database.instance;
         }
 
-        // Tạo ID ngẫu nhiên để demo
-        this.id = Math.random().toString(36).substring(2, 9);
-        console.log('Creating new Database instance, id =', this.id);
-
         console.log('Initializing PostgreSQL Pool...');
 
         this.pool = new Pool({
